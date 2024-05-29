@@ -1,0 +1,57 @@
+api:
+  insecure: true
+  dashboard: true
+
+global:
+  sendAnonymousUsage: false
+
+entryPoints:
+  web_80:
+    address: ":80/tcp"
+
+  web_443:
+    address: ":443/tcp"
+
+  redis:
+    address: ":6379/tcp"
+
+  pgsql_space:
+    address: ":25432/tcp"
+
+  pgsql_education:
+      address: ":25433/tcp"
+
+#  centrifugo_http:
+#    address: ":8000/tcp"
+
+#  mysql_website-admin:
+#    address: ":13306/tcp"
+#
+#  mysql_pms:
+#    address: ":13307/tcp"
+#
+#  mysql_landing:
+#    address: ":13308/tcp"
+#
+#  pgsql_cabinet:
+#    address: ":15432/tcp"
+#
+#  pgsql_pms-backend-website:
+#    address: ":15433/tcp"
+
+providers:
+  providersThrottleDuration: 5
+
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    defaultRule: "Host(`{{ normalize .Name }}.cdek.local`)"
+    watch: true
+
+  file:
+    directory: "/etc/traefik/custom"
+    watch: true
+
+log:
+  level: INFO
+  format: common
