@@ -15,7 +15,7 @@ type Configs struct {
 
 // InitConfigs Инициализруем конфиги
 func InitConfigs() (*Configs, error) {
-	envData, err := godotenv.Read("./sudoku-config/.env")
+	envData, err := godotenv.Read(".env")
 
 	if err != nil {
 		logrus.Fatal("init env failed: %w", err)
@@ -30,8 +30,8 @@ func InitConfigs() (*Configs, error) {
 
 	configs := Configs{}
 	if err := envconfig.Init(&configs); err != nil {
-		return Configs{}, err
+		return &Configs{}, err
 	}
 
-	return configs, nil
+	return &configs, nil
 }

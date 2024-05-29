@@ -12,8 +12,6 @@ import (
 	"sudoku-golang/internal/infra/configs"
 )
 
-var env configs.Configs
-
 type Composer struct {
 	ComposeFiles          []string
 	ForceRebuild          bool
@@ -25,14 +23,16 @@ type Composer struct {
 	dockerComposeTemplate string
 }
 
+var env *configs.Configs
+
 func NewComposer(forceRebuild bool, envVars []string) *Composer {
-	var env, err = configs.InitConfigs()
+	var err error
+	env, err = configs.InitConfigs()
 
 	if err != nil {
 		logrus.Infoln(err)
 	}
 
-	logrus.Infoln(env)
 	c := &Composer{
 		ForceRebuild: forceRebuild,
 		EnvVars:      envVars,
@@ -47,8 +47,15 @@ func (c *Composer) FindComposeFiles() {
 	var files []string
 	globPatterns := []string{"compose.yaml", "*/compose-sudoku.yaml"}
 
+	rootProjectsFolder := env.ConfigProject.RootProjectsFolder
+
+	if rootProjectsFolder == "" {
+		logrus.Fatal("Переменная окружения ROOT_PROJECTS_FOLDER не установлена")
+	}
+
 	for _, pattern := range globPatterns {
-		matches, err := filepath.Glob(pattern)
+		fullPattern := filepath.Join(rootProjectsFolder, pattern)
+		matches, err := filepath.Glob(fullPattern)
 		if err != nil {
 			logrus.WithError(err).Fatal("Ошибка при поиске файлов")
 		}

@@ -1,2 +1,2 @@
-sudoku-config/.env
+cmd/sudoku/.env
 .idea

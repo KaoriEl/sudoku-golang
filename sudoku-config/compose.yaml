@@ -1,0 +1,162 @@
+version: "3.7"
+
+services:
+  traefik:
+    image: traefik:2.9.6
+
+    hostname: traefik
+    container_name: traefik
+
+    networks:
+    - sudoku_network
+
+    ports:
+    - "127.0.0.1:8080:8080/tcp"
+    - "80:80/tcp"
+    - "443:443/tcp"
+    - "16379:6379/tcp"
+    - "8000:8000/tcp"
+
+    - "13306:13306/tcp"
+    - "13307:13307/tcp"
+    - "15432:15432/tcp" # cabinet
+    - "25432:25432/tcp" # space
+    - "25433:25433/tcp" # edstein
+
+    restart: unless-stopped
+
+    volumes:
+    - /etc/localtime:/etc/localtime:ro,cached
+    - /var/run/docker.sock:/var/run/docker.sock:ro,cached
+    - ./_common/traefik/custom:/etc/traefik/custom:ro,cached
+    - ./_common/traefik/traefik.yaml:/etc/traefik/traefik.yaml:ro,cached
+
+  redis:
+    user: ${DOCKER_UID}:${DOCKER_GID}
+    image: eqalpha/keydb:latest
+
+    hostname: redis
+    container_name: redis
+
+    depends_on:
+    - traefik
+
+    networks:
+    - sudoku_network
+
+    expose:
+    - "6379/tcp"
+
+    restart: unless-stopped
+
+    volumes:
+    - ./_common/redis/data:/data:delegated
+
+    labels:
+    - "traefik.enable=true"
+    - "traefik.tcp.routers.redis.entrypoints=redis"
+    - "traefik.tcp.routers.redis.rule=HostSNI(`*`)"
+    - "traefik.tcp.routers.redis.service=redis"
+    - "traefik.tcp.services.redis.loadBalancer.server.port=6379"
+
+
+  # elasticsearch:
+  #   user: ${DOCKER_UID}:${DOCKER_GID}
+  #   image: elasticsearch:7.14.1
+
+  #   hostname: elasticsearch
+  #   container_name: elasticsearch
+
+  #   depends_on:
+  #   - traefik
+
+  #   networks:
+  #   - sudoku_network
+
+  #   expose:
+  #   - "9200/tcp"
+
+  #   restart: unless-stopped
+
+  #   volumes:
+  #     - ./_common/elasticsearch/data:/usr/local/etc/elasticsearch/data:delegated
+  #   environment:
+  #     ES_JAVA_OPTS: -Xms512m -Xmx512m
+  #     discovery.type: single-node
+
+  #   labels:
+  #   - "traefik.enable=true"
+  #   - "traefik.tcp.routers.elasticsearch.entrypoints=elasticsearch"
+  #   - "traefik.tcp.routers.elasticsearch.rule=HostSNI(`*`)"
+  #   - "traefik.tcp.routers.elasticsearch.service=elasticsearch"
+  #   - "traefik.tcp.services.elasticsearch.loadBalancer.server.port=9200"
+
+
+#  kibana:
+#    user: ${DOCKER_UID}:${DOCKER_GID}
+#    hostname: kibana
+#    container_name: kibana
+#    image: kibana:7.14.1
+#    environment:
+#      # - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+#      # - ELASTICSEARCH_HOSTS=http://elastic6-cluster.service.cdek.tech:9200
+#      # - ELASTICSEARCH_HOSTS=http://qa2.elastic6.service.cdek.tech:9200
+#      - ELASTICSEARCH_HOSTS=http://172.16.185.164:9200
+#    networks:
+#      - sudoku_network
+#    depends_on:
+#      - traefik
+#      # - elasticsearch
+#    expose:
+#    - "5601/tcp"
+#    ports:
+#      - 5601:5601
+#    labels:
+#    - "traefik.enable=true"
+#    - "traefik.tcp.routers.kibana.entrypoints=kibana"
+#    - "traefik.tcp.routers.kibana.rule=HostSNI(`*`)"
+#    - "traefik.tcp.routers.kibana.service=kibana"
+#    - "traefik.tcp.services.kibana.loadBalancer.server.port=5601"
+
+
+
+#  centrifugo:
+#    image: centrifugo/centrifugo:v3.0.1
+#
+#    hostname: centrifugo
+#    container_name: centrifugo
+#
+#    ulimits:
+#      nofile:
+#        soft: 65535
+#        hard: 65535
+#
+#    depends_on:
+#    - traefik
+#
+#    networks:
+#    - sudoku_network
+#
+#    expose:
+#    - "8000/tcp"
+#
+#    restart: unless-stopped
+#
+#    volumes:
+#    - ./_common/centrifugo/config.json:/centrifugo/config.json:cached
+#
+#    command: centrifugo -c config.json
+#
+#    labels:
+#    - "traefik.enable=true"
+#    - "traefik.http.routers.centrifugo_http.entrypoints=centrifugo_http"
+#    - "traefik.http.routers.centrifugo_http.rule=Host(`centrifugo.cdek.local`)"
+#    - "traefik.http.routers.centrifugo_http.service=centrifugo_http"
+#    - "traefik.http.services.centrifugo_http.loadBalancer.server.port=8000"
+
+networks:
+  sudoku_network:
+    name: sudoku_network
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv6: "false"
