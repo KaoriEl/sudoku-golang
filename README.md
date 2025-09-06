@@ -29,7 +29,7 @@
 1. Клонируйте репозиторий:
 
    ```sh
-   git clone <URL-репозитория>
+   git clone
    cd sudoku-golang
    ```
 
