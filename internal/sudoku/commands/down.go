@@ -1,12 +1,14 @@
 package commands
 
 import (
+	"log/slog"
 	"os"
+	"sudoku-golang/internal/infra/configs"
 	"sudoku-golang/internal/service"
 )
 
-func down() {
-	composer := service.NewComposer(false, os.Environ())
+func down(log *slog.Logger, config *configs.Config) {
+	composer := service.NewComposer(log, false, os.Environ(), config)
 
 	composer.Down()
 }

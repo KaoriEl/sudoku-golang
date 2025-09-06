@@ -12,14 +12,56 @@ entryPoints:
   web_443:
     address: ":443/tcp"
 
+  web_5173:
+    address: ":5173/tcp"
+
+  web_8081:
+    address: ":8081/tcp"
+
+  web_587:
+    address: ":587/tcp"
+
+  web_993:
+    address: ":993/tcp"
+
+  web_995:
+    address: ":995/tcp"
+
+  web_8443:
+    address: ":8443/tcp"
+
+  web_7071:
+    address: ":7071/tcp"
+
+  web_9071:
+    address: ":9071/tcp"
+
   redis:
     address: ":6379/tcp"
 
-  pgsql_space:
-    address: ":25432/tcp"
+  web_25:
+    address: ":25/tcp"
 
-  pgsql_education:
-      address: ":25433/tcp"
+  web_465:
+    address: ":465/tcp"
+
+  web_143:
+    address: ":143/tcp"
+
+  web_110:
+    address: ":110/tcp"
+
+  pgsql_cloud:
+    address: ":5432/tcp"
+
+  elasticsearch:
+    address: ":9200/tcp"
+
+  rabbitmq:
+    address: ":5672/tcp"
+
+#  pgsql_example_project:
+#    address: ":5433/tcp"
 
 #  centrifugo_http:
 #    address: ":8000/tcp"
@@ -54,4 +96,5 @@ providers:
 
 log:
   level: INFO
-  format: common
+  format: text
+  filePath: "./traefik.log"

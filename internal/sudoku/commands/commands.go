@@ -1,115 +1,208 @@
 package commands
 
 import (
+	"fmt"
+	"log/slog"
+	"sudoku-golang/internal/infra/configs"
+	"sudoku-golang/internal/logger"
+
+	"github.com/alperdrsnn/clime"
 	"github.com/spf13/cobra"
 )
 
-func GetCommands() []*cobra.Command {
-	cmds := []*cobra.Command{
-		commandBuild(),
-		commandStart(),
-		commandStop(),
-		commandForceBuild(),
-		commandDown(),
-		commandRestart(),
-		commandRebuild(),
-		commandForceRebuild(),
+const (
+	// Логи
+	logEnabledMsg  = "«%s» command executed with logging enabled"
+	logDisabledMsg = "«%s» command executed with logging disabled"
+	logFlagDesc    = "Turn on detailed log"
+
+	// Старт/финиш команд
+	startCmdMsg  = "Starting command «%s»"
+	finishCmdMsg = "Finish command «%s»..."
+
+	// Описания команд
+	descBuild        = "Собирает все контейнеры"
+	descStart        = "Запускает собранные контейнеры"
+	descStop         = "Останавливает все контейнеры"
+	descForceBuild   = "Принудительно собирает контейнеры"
+	descDown         = "Останавливает и удаляет все контейнеры"
+	descRestart      = "Перезапускает все контейнеры"
+	descRebuild      = "Останавливает, собирает и запускает все контейнеры"
+	descForceRebuild = "Принудительно пересобираем контейнеры"
+)
+
+func logCommandRun(log *slog.Logger, cmd *cobra.Command, logEnabled bool) *slog.Logger {
+	msg := logDisabledMsg
+	if logEnabled {
+		msg = logEnabledMsg
 	}
-	return cmds
+
+	log = logger.NewLogger(logEnabled)
+	log.Info(fmt.Sprintf(msg, cmd.Use))
+	return log
 }
 
-func commandBuild() *cobra.Command {
-	return &cobra.Command{
+func GetCommands(log *slog.Logger, config *configs.Config) []*cobra.Command {
+	return []*cobra.Command{
+		commandBuild(log, config),
+		commandStart(log, config),
+		commandStop(log, config),
+		commandForceBuild(log, config),
+		commandDown(log, config),
+		commandRestart(log, config),
+		commandRebuild(log, config),
+		commandForceRebuild(log, config),
+	}
+}
+
+func commandBuild(log *slog.Logger, config *configs.Config) *cobra.Command {
+	var logEnabled bool
+
+	cmd := &cobra.Command{
 		Use:   "build",
-		Short: "Собирает все контейнеры",
-		Long:  ``,
+		Short: descBuild,
 		Args:  cobra.MinimumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
-			build()
+			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
+			log = logCommandRun(log, cmd, logEnabled)
+			build(log, config)
+			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
 		},
 	}
+
+	cmd.Flags().BoolVar(&logEnabled, "log", false, logFlagDesc)
+	return cmd
 }
 
-func commandStop() *cobra.Command {
-	return &cobra.Command{
-		Use:   "stop",
-		Short: "Останавливает все контейнеры",
-		Long:  ``,
-		Args:  cobra.MinimumNArgs(0),
-		Run: func(cmd *cobra.Command, args []string) {
-			stop()
-		},
-	}
-}
+func commandStart(log *slog.Logger, config *configs.Config) *cobra.Command {
+	var logEnabled bool
 
-func commandStart() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "start",
-		Short: "запускает собранные контейнеры",
-		Long:  ``,
+		Short: descStart,
 		Args:  cobra.MinimumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
-			start()
+			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
+			log = logCommandRun(log, cmd, logEnabled)
+			start(log, config)
+			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
 		},
 	}
+
+	cmd.Flags().BoolVar(&logEnabled, "log", false, logFlagDesc)
+	return cmd
 }
 
-func commandForceBuild() *cobra.Command {
-	return &cobra.Command{
+func commandStop(log *slog.Logger, config *configs.Config) *cobra.Command {
+	var logEnabled bool
+
+	cmd := &cobra.Command{
+		Use:   "stop",
+		Short: descStop,
+		Args:  cobra.MinimumNArgs(0),
+		Run: func(cmd *cobra.Command, args []string) {
+			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
+			log = logCommandRun(log, cmd, logEnabled)
+			stop(log, config)
+			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
+		},
+	}
+
+	cmd.Flags().BoolVar(&logEnabled, "log", false, logFlagDesc)
+	return cmd
+}
+
+func commandForceBuild(log *slog.Logger, config *configs.Config) *cobra.Command {
+	var logEnabled bool
+
+	cmd := &cobra.Command{
 		Use:   "force-build",
-		Short: "принудительно собирает контейнеры",
-		Long:  ``,
+		Short: descForceBuild,
 		Args:  cobra.MinimumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
-			forceBuild()
+			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
+			log = logCommandRun(log, cmd, logEnabled)
+			forceBuild(log, config)
+			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
 		},
 	}
+
+	cmd.Flags().BoolVar(&logEnabled, "log", false, logFlagDesc)
+	return cmd
 }
 
-func commandDown() *cobra.Command {
-	return &cobra.Command{
+func commandDown(log *slog.Logger, config *configs.Config) *cobra.Command {
+	var logEnabled bool
+
+	cmd := &cobra.Command{
 		Use:   "down",
-		Short: "Останавливает и удаляет все контейнеры",
-		Long:  ``,
+		Short: descDown,
 		Args:  cobra.MinimumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
-			down()
+			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
+			log = logCommandRun(log, cmd, logEnabled)
+			down(log, config)
+			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
 		},
 	}
+
+	cmd.Flags().BoolVar(&logEnabled, "log", false, logFlagDesc)
+	return cmd
 }
 
-func commandRestart() *cobra.Command {
-	return &cobra.Command{
+func commandRestart(log *slog.Logger, config *configs.Config) *cobra.Command {
+	var logEnabled bool
+
+	cmd := &cobra.Command{
 		Use:   "restart",
-		Short: "Перезапускает все контейнеры",
-		Long:  ``,
+		Short: descRestart,
 		Args:  cobra.MinimumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
-			restart()
+			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
+			log = logCommandRun(log, cmd, logEnabled)
+			restart(log, config)
+			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
 		},
 	}
+
+	cmd.Flags().BoolVar(&logEnabled, "log", false, logFlagDesc)
+	return cmd
 }
 
-func commandRebuild() *cobra.Command {
-	return &cobra.Command{
+func commandRebuild(log *slog.Logger, config *configs.Config) *cobra.Command {
+	var logEnabled bool
+
+	cmd := &cobra.Command{
 		Use:   "rebuild",
-		Short: "Останавливает, собирает и запускает все контейнеры",
-		Long:  ``,
+		Short: descRebuild,
 		Args:  cobra.MinimumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
-			rebuild()
+			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
+			log = logCommandRun(log, cmd, logEnabled)
+			rebuild(log, config)
+			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
 		},
 	}
+
+	cmd.Flags().BoolVar(&logEnabled, "log", false, logFlagDesc)
+	return cmd
 }
 
-func commandForceRebuild() *cobra.Command {
-	return &cobra.Command{
+func commandForceRebuild(log *slog.Logger, config *configs.Config) *cobra.Command {
+	var logEnabled bool
+
+	cmd := &cobra.Command{
 		Use:   "force-rebuild",
-		Short: "принудительно пересобирает контейнеры",
-		Long:  ``,
+		Short: descForceRebuild,
 		Args:  cobra.MinimumNArgs(0),
 		Run: func(cmd *cobra.Command, args []string) {
-			forceRebuild()
+			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
+			log = logCommandRun(log, cmd, logEnabled)
+			forceRebuild(log, config)
+			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
 		},
 	}
+
+	cmd.Flags().BoolVar(&logEnabled, "log", false, logFlagDesc)
+	return cmd
 }
