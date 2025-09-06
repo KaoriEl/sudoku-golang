@@ -12,8 +12,6 @@
 
 This project is a CLI tool written in Go for managing infrastructure and services related to Sudoku via `docker-compose`. It allows you to conveniently build, start, stop, and rebuild containers through a set of commands.
 
----
-
 ## Table of Contents 📑
 
 * [Description](#description)
