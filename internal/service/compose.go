@@ -84,8 +84,8 @@ func (c *Composer) setProgressBar(countFiles int) {
 	c.progressBar.Print()
 }
 
-func (c *Composer) addProgress(step int, finishMessage string) {
-	c.currentProgress += int64(step)
+func (c *Composer) addProgress(finishMessage string) {
+	c.currentProgress += 1
 	if c.currentProgress > c.totalProgress {
 		c.currentProgress = c.totalProgress
 	}
@@ -116,7 +116,7 @@ func (c *Composer) Build() {
 			fields := c.setLogFields(composeFile, execCmd)
 			c.log.Error("Ошибка выполнения команды сборки", slog.Any("error", err), slog.Any("fields", fields))
 		} else {
-			c.addProgress(1, "Сборка окончена")
+			c.addProgress("Сборка окончена")
 		}
 	}
 }
@@ -135,7 +135,7 @@ func (c *Composer) Start() {
 			fields := c.setLogFields(composeFile, execCmd)
 			c.log.Error("Ошибка выполнения команды запуска", slog.Any("error", err), slog.Any("fields", fields))
 		} else {
-			c.addProgress(1, "Все контейнеры запущены")
+			c.addProgress("Все контейнеры запущены")
 		}
 	}
 }
@@ -155,7 +155,7 @@ func (c *Composer) Stop() {
 				fields := c.setLogFields(composeFile, execCmd)
 				c.log.Error("Ошибка выполнения команды остановки", slog.Any("error", err), slog.Any("fields", fields))
 			} else {
-				c.addProgress(1, "Все контейнеры остановлены")
+				c.addProgress("Все контейнеры остановлены")
 			}
 		})
 	}
@@ -177,7 +177,7 @@ func (c *Composer) Down() {
 				fields := c.setLogFields(composeFile, execCmd)
 				c.log.Error("Ошибка выполнения команды остановки и удаления", slog.Any("error", err), slog.Any("fields", fields))
 			} else {
-				c.addProgress(1, "Все контейнеры остановлены и удалены")
+				c.addProgress("Все контейнеры остановлены и удалены")
 			}
 		})
 	}

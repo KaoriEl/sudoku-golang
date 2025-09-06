@@ -15,9 +15,7 @@ type Config struct {
 	RootProjectsFolder string
 }
 
-var (
-	secretsPath = "/vault/secrets/"
-)
+var secretsPath = "/vault/secrets/"
 
 func MustLoad() (*Config, error) {
 	if err := godotenv.Load(); err != nil {
@@ -54,7 +52,13 @@ func readValueAsInt(valueName string, defaultValue int) int {
 	}
 	n, err := strconv.Atoi(str)
 	if err != nil {
-		slog.Warn("Failed to parse int config value, using default", slog.String("key", valueName), slog.String("value", str), slog.Int("default", defaultValue), slog.Any("error", err))
+		slog.Warn(
+			"Failed to parse int config value, using default",
+			slog.String("key", valueName),
+			slog.String("value", str),
+			slog.Int("default", defaultValue),
+			slog.Any("error", err),
+		)
 		return defaultValue
 	}
 	return n

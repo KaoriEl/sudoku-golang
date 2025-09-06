@@ -1,6 +1,7 @@
 package sudoku
 
 import (
+	"fmt"
 	"log/slog"
 	"sudoku-golang/internal/infra/configs"
 	"sudoku-golang/internal/sudoku/commands"
@@ -11,15 +12,17 @@ import (
 
 func Run(log *slog.Logger, cfg *configs.Config) error {
 	clime.InfoLine("Starting application...")
-	var rootCmd = &cobra.Command{Use: "run"}
+	rootCmd := &cobra.Command{Use: "run"}
 	cmds := commands.GetCommands(log, cfg)
 	rootCmd.AddCommand(cmds...)
 	clime.SuccessLine("Application started successfully!")
-	err := rootCmd.Execute()
-	if err != nil {
-		log.Error("Command execution failed", "error", err)
-		clime.ErrorLine("Command execution failed: " + err.Error())
-		return err
+
+	if err := rootCmd.Execute(); err != nil {
+		wrappedErr := fmt.Errorf("failed to execute root command: %w", err)
+		log.Error("Command execution failed", "error", wrappedErr)
+		clime.ErrorLine("Command execution failed: " + wrappedErr.Error())
+		return wrappedErr
 	}
+
 	return nil
 }

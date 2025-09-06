@@ -46,10 +46,16 @@ else
     echo "ℹ️ Папка ${CONFIG_DIR} уже существует в руте, копирование пропущено"
 fi
 
-COMPOSE_FILE="${CONFIG_DIR}/compose.yaml"
-if [[ -f "${COMPOSE_FILE}" ]]; then
-    cp -f "${COMPOSE_FILE}" "${ROOT_PROJECTS_FOLDER}/compose.yaml"
-    echo "✅ compose.yaml скопирован в: ${ROOT_PROJECTS_FOLDER}/compose.yaml"
+COMPOSE_SOURCE="${CONFIG_DIR}/compose.yaml"
+COMPOSE_TARGET="${ROOT_PROJECTS_FOLDER}/compose.yaml"
+
+if [[ -f "${COMPOSE_SOURCE}" ]]; then
+    if [[ ! -f "${COMPOSE_TARGET}" ]]; then
+        cp -f "${COMPOSE_SOURCE}" "${COMPOSE_TARGET}"
+        echo "✅ compose.yaml скопирован в: ${COMPOSE_TARGET}"
+    else
+        echo "ℹ️ compose.yaml уже существует в руте, копирование пропущено"
+    fi
 else
     echo "⚠️ compose.yaml не найден в ${CONFIG_DIR}, пропускаю копирование"
 fi
