@@ -76,7 +76,7 @@ func (c *Composer) setProgressBar(countFiles int) {
 	c.totalProgress = int64(countFiles)
 	c.currentProgress = 0
 	c.progressBar = clime.NewProgressBar(c.totalProgress).
-		WithLabel("Обработка проектов...").
+		WithLabel("Project processing...").
 		WithStyle(clime.ProgressStyleModern).
 		WithColor(clime.CyanColor).
 		ShowRate(true)
