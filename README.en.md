@@ -113,7 +113,7 @@ The project uses Docker Compose to run the local infrastructure required for the
 
 #### Elasticsearch 🔍
 
-* Image: `elasticsearch:7.14.1`
+* Image: `elasticsearch:9.1.8`
 * Used for storing and searching large volumes of data.
 * Configuration:
 
@@ -124,7 +124,7 @@ The project uses Docker Compose to run the local infrastructure required for the
 
 #### RabbitMQ 🐇
 
-* Image: `rabbitmq:3.12-management-alpine`
+* Image: `rabbitmq:4.2.1-management-alpine`
 * Message broker for inter-service communication.
 * Exposed ports:
 
