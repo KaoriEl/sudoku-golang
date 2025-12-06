@@ -91,7 +91,7 @@ The project uses Docker Compose to run the local infrastructure required for the
 
 #### Traefik 🌐
 
-* Version: `2.9.6`
+* Version: `2.11.31`
 * Reverse proxy for routing traffic to other services.
 * Exposed ports:
 
