@@ -48,6 +48,7 @@ fi
 
 COMPOSE_SOURCE="${CONFIG_DIR}/compose.yaml"
 COMPOSE_TARGET="${ROOT_PROJECTS_FOLDER}/compose.yaml"
+COMPOSE_TARGET_CONFIG="${ROOT_PROJECTS_FOLDER}/${CONFIG_DIR}/compose.yaml"
 
 if [[ -f "${COMPOSE_SOURCE}" ]]; then
     if [[ ! -f "${COMPOSE_TARGET}" ]]; then
@@ -60,4 +61,49 @@ else
     echo "⚠️ compose.yaml не найден в ${CONFIG_DIR}, пропускаю копирование"
 fi
 
+
+sync_image_versions() {
+    local src="$1"
+    local dst="$2"
+
+    if [[ ! -f "$src" || ! -f "$dst" ]]; then
+        echo "⚠️ Не могу синкать версии — один из файлов отсутствует ($src / $dst)"
+        return
+    fi
+
+    echo "🔍 Синхронизирую версии образов: $dst"
+
+    while IFS= read -r src_line; do
+        if [[ "$src_line" =~ ^[[:space:]]*image:[[:space:]]+([^:]+):(.*)$ ]]; then
+            src_image_full=$(echo "$src_line" | awk '{print $2}')
+            src_repo=$(echo "$src_image_full" | cut -d':' -f1)
+            src_tag=$(echo "$src_image_full" | cut -d':' -f2)
+
+            dst_line=$(grep -E "^[[:space:]]*image:[[:space:]]+${src_repo}:" "$dst" || true)
+
+            if [[ -n "$dst_line" ]]; then
+                dst_image_full=$(echo "$dst_line" | awk '{print $2}')
+                dst_tag=$(echo "$dst_image_full" | cut -d':' -f2)
+
+                if [[ "$src_tag" != "$dst_tag" ]]; then
+                    echo "♻️ ${src_repo}: $dst_tag → $src_tag"
+                    sed -i -E "s|(${src_repo}:)[^[:space:]]+|\1${src_tag}|g" "$dst"
+                fi
+            fi
+        fi
+    done < "$src"
+}
+
+# 🔥 Синк в оба файла
+if [[ -f "$COMPOSE_SOURCE" ]]; then
+    if [[ -f "$COMPOSE_TARGET" ]]; then
+        sync_image_versions "$COMPOSE_SOURCE" "$COMPOSE_TARGET"
+    fi
+
+    if [[ -f "$COMPOSE_TARGET_CONFIG" ]]; then
+        sync_image_versions "$COMPOSE_SOURCE" "$COMPOSE_TARGET_CONFIG"
+    fi
+fi
+
 rm -rf build
+echo "🎉 Готово!"
