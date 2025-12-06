@@ -68,7 +68,7 @@ services:
 
   elasticsearch:
     user: ${DOCKER_UID}:${DOCKER_GID}
-    image: elasticsearch:7.14.1
+    image: elasticsearch:9.1.8
 
     hostname: elasticsearch
     container_name: elasticsearch
@@ -98,7 +98,7 @@ services:
       - "traefik.tcp.services.elasticsearch.loadBalancer.server.port=9200"
 
   rabbitmq:
-    image: rabbitmq:3.12-management-alpine
+    image: rabbitmq:4.2.1-management-alpine
     restart: unless-stopped
     environment:
       - "RABBITMQ_DEFAULT_USER=default"
