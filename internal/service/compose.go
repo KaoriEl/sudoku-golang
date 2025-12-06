@@ -25,15 +25,17 @@ type Composer struct {
 	wp                    *workerpool.WorkerPool
 	dockerComposeTemplate string
 	config                *configs.Config
+	Debug                 bool
 }
 
-func NewComposer(log *slog.Logger, forceRebuild bool, envVars []string, config *configs.Config) *Composer {
+func NewComposer(log *slog.Logger, forceRebuild bool, envVars []string, config *configs.Config, debug bool) *Composer {
 	c := &Composer{
 		log:          log,
 		ForceRebuild: forceRebuild,
 		EnvVars:      envVars,
 		wp:           workerpool.New(config.MaxWorkers),
 		config:       config,
+		Debug:        debug,
 	}
 	c.setDockerComposeTemplate()
 	c.FindComposeFiles()
@@ -75,6 +77,11 @@ func (c *Composer) FindComposeFiles() {
 func (c *Composer) setProgressBar(countFiles int) {
 	c.totalProgress = int64(countFiles)
 	c.currentProgress = 0
+	// В режиме debug не показываем прогресс-бар — логируем шаги явно
+	if c.Debug {
+		c.progressBar = nil
+		return
+	}
 	c.progressBar = clime.NewProgressBar(c.totalProgress).
 		WithLabel("Project processing...").
 		WithStyle(clime.ProgressStyleModern).
@@ -89,6 +96,16 @@ func (c *Composer) addProgress(finishMessage string) {
 	if c.currentProgress > c.totalProgress {
 		c.currentProgress = c.totalProgress
 	}
+
+	// Если прогресс-бар не инициализирован (debug режим), просто логируем прогресс
+	if c.progressBar == nil {
+		c.log.Info("Progress update", "current", c.currentProgress, "total", c.totalProgress)
+		if c.currentProgress == c.totalProgress {
+			c.log.Info(finishMessage)
+		}
+		return
+	}
+
 	c.progressBar.Set(c.currentProgress)
 	c.progressBar.Print()
 
@@ -188,6 +205,11 @@ func (c *Composer) setCommand(execCmd string) {
 	cmd := exec.Command("bash", "-c", execCmd)
 	cmd.Env = append(cmd.Env, c.EnvVars...)
 	c.cmd = cmd
+
+	if c.Debug {
+		c.log.Info("Executing command", "execCmd", execCmd)
+		clime.InfoLine(fmt.Sprintf("[debug] %s", execCmd))
+	}
 }
 
 func (c *Composer) setProjectName(composeFile string) {

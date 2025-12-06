@@ -7,7 +7,7 @@ import (
 	"sudoku-golang/internal/service"
 )
 
-func stop(log *slog.Logger, config *configs.Config) {
-	composer := service.NewComposer(log, false, os.Environ(), config)
+func stop(log *slog.Logger, config *configs.Config, debug *bool) {
+	composer := service.NewComposer(log, false, os.Environ(), config, *debug)
 	composer.Stop()
 }

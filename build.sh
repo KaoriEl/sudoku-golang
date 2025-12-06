@@ -48,62 +48,45 @@ fi
 
 COMPOSE_SOURCE="${CONFIG_DIR}/compose.yaml"
 COMPOSE_TARGET="${ROOT_PROJECTS_FOLDER}/compose.yaml"
-COMPOSE_TARGET_CONFIG="${ROOT_PROJECTS_FOLDER}/${CONFIG_DIR}/compose.yaml"
 
-if [[ -f "${COMPOSE_SOURCE}" ]]; then
-    if [[ ! -f "${COMPOSE_TARGET}" ]]; then
-        cp -f "${COMPOSE_SOURCE}" "${COMPOSE_TARGET}"
-        echo "✅ compose.yaml скопирован в: ${COMPOSE_TARGET}"
-    else
-        echo "ℹ️ compose.yaml уже существует в руте, копирование пропущено"
-    fi
-else
-    echo "⚠️ compose.yaml не найден в ${CONFIG_DIR}, пропускаю копирование"
+if [[ ! -f "${COMPOSE_SOURCE}" ]]; then
+    die "⚠️ compose.yaml не найден в ${CONFIG_DIR}"
 fi
 
+PREFIX=$(grep '^PREFIX_CONTAINER_NAME=' .env | cut -d '=' -f2- | xargs)
 
-sync_image_versions() {
-    local src="$1"
-    local dst="$2"
+echo "🔍 Генерирую новый compose.yaml с префиксом: '${PREFIX}' в ${COMPOSE_TARGET}"
 
-    if [[ ! -f "$src" || ! -f "$dst" ]]; then
-        echo "⚠️ Не могу синкать версии — один из файлов отсутствует ($src / $dst)"
-        return
-    fi
+awk -v prefix="$PREFIX" '
+function trim(s) { gsub(/^[ \t"]+|[ \t"]+$/, "", s); return s }
 
-    echo "🔍 Синхронизирую версии образов: $dst"
-
-    while IFS= read -r src_line; do
-        if [[ "$src_line" =~ ^[[:space:]]*image:[[:space:]]+([^:]+):(.*)$ ]]; then
-            src_image_full=$(echo "$src_line" | awk '{print $2}')
-            src_repo=$(echo "$src_image_full" | cut -d':' -f1)
-            src_tag=$(echo "$src_image_full" | cut -d':' -f2)
-
-            dst_line=$(grep -E "^[[:space:]]*image:[[:space:]]+${src_repo}:" "$dst" || true)
-
-            if [[ -n "$dst_line" ]]; then
-                dst_image_full=$(echo "$dst_line" | awk '{print $2}')
-                dst_tag=$(echo "$dst_image_full" | cut -d':' -f2)
-
-                if [[ "$src_tag" != "$dst_tag" ]]; then
-                    echo "♻️ ${src_repo}: $dst_tag → $src_tag"
-                    sed -i -E "s|(${src_repo}:)[^[:space:]]+|\1${src_tag}|g" "$dst"
-                fi
-            fi
-        fi
-    done < "$src"
+# container_name
+/^[[:space:]]*container_name:/ {
+    indent = substr($0, 1, match($0, /container_name:/)-1)
+    val = trim(substr($0, index($0,$2)))
+    n = split(val, parts, "_")
+    svc = parts[n]
+    if (length(prefix) > 0) {
+        newval = prefix "_" svc
+    } else {
+        newval = svc
+    }
+    print indent "container_name: " newval
+    print "♻️ container_name: → " newval > "/dev/stderr"
+    next
 }
 
-# 🔥 Синк в оба файла
-if [[ -f "$COMPOSE_SOURCE" ]]; then
-    if [[ -f "$COMPOSE_TARGET" ]]; then
-        sync_image_versions "$COMPOSE_SOURCE" "$COMPOSE_TARGET"
-    fi
+# hostname
+/^[[:space:]]*hostname:/ {
+    indent = substr($0, 1, match($0, /hostname:/)-1)
+    val = trim(substr($0, index($0,$2)))
+    print indent "hostname: " val
+    print "♻️ hostname: → " val > "/dev/stderr"
+    next
+}
 
-    if [[ -f "$COMPOSE_TARGET_CONFIG" ]]; then
-        sync_image_versions "$COMPOSE_SOURCE" "$COMPOSE_TARGET_CONFIG"
-    fi
-fi
+{print}
+' "$COMPOSE_SOURCE" > "$COMPOSE_TARGET"
 
 rm -rf build
 echo "🎉 Готово!"

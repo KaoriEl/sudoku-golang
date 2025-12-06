@@ -7,8 +7,8 @@ import (
 	"sudoku-golang/internal/service"
 )
 
-func forceBuild(log *slog.Logger, config *configs.Config) {
-	composer := service.NewComposer(log, true, os.Environ(), config)
+func forceBuild(log *slog.Logger, config *configs.Config, debug *bool) {
+	composer := service.NewComposer(log, true, os.Environ(), config, *debug)
 
 	composer.Build()
 }

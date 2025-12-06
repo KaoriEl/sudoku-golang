@@ -42,20 +42,21 @@ func logCommandRun(cmd *cobra.Command, logEnabled bool) *slog.Logger {
 	return newLog
 }
 
-func GetCommands(log *slog.Logger, config *configs.Config) []*cobra.Command {
+// GetCommands теперь принимает указатель на глобальный флаг debug.
+func GetCommands(log *slog.Logger, config *configs.Config, debug *bool) []*cobra.Command {
 	return []*cobra.Command{
-		commandBuild(log, config),
-		commandStart(log, config),
-		commandStop(log, config),
-		commandForceBuild(log, config),
-		commandDown(log, config),
-		commandRestart(log, config),
-		commandRebuild(log, config),
-		commandForceRebuild(log, config),
+		commandBuild(log, config, debug),
+		commandStart(log, config, debug),
+		commandStop(log, config, debug),
+		commandForceBuild(log, config, debug),
+		commandDown(log, config, debug),
+		commandRestart(log, config, debug),
+		commandRebuild(log, config, debug),
+		commandForceRebuild(log, config, debug),
 	}
 }
 
-func commandBuild(log *slog.Logger, config *configs.Config) *cobra.Command {
+func commandBuild(log *slog.Logger, config *configs.Config, debug *bool) *cobra.Command {
 	var logEnabled bool
 
 	cmd := &cobra.Command{
@@ -65,7 +66,7 @@ func commandBuild(log *slog.Logger, config *configs.Config) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
 			log = logCommandRun(cmd, logEnabled)
-			build(log, config)
+			build(log, config, debug)
 			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
 		},
 	}
@@ -74,7 +75,7 @@ func commandBuild(log *slog.Logger, config *configs.Config) *cobra.Command {
 	return cmd
 }
 
-func commandStart(log *slog.Logger, config *configs.Config) *cobra.Command {
+func commandStart(log *slog.Logger, config *configs.Config, debug *bool) *cobra.Command {
 	var logEnabled bool
 
 	cmd := &cobra.Command{
@@ -84,7 +85,7 @@ func commandStart(log *slog.Logger, config *configs.Config) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
 			log = logCommandRun(cmd, logEnabled)
-			start(log, config)
+			start(log, config, debug)
 			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
 		},
 	}
@@ -93,7 +94,7 @@ func commandStart(log *slog.Logger, config *configs.Config) *cobra.Command {
 	return cmd
 }
 
-func commandStop(log *slog.Logger, config *configs.Config) *cobra.Command {
+func commandStop(log *slog.Logger, config *configs.Config, debug *bool) *cobra.Command {
 	var logEnabled bool
 
 	cmd := &cobra.Command{
@@ -103,7 +104,7 @@ func commandStop(log *slog.Logger, config *configs.Config) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
 			log = logCommandRun(cmd, logEnabled)
-			stop(log, config)
+			stop(log, config, debug)
 			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
 		},
 	}
@@ -112,7 +113,7 @@ func commandStop(log *slog.Logger, config *configs.Config) *cobra.Command {
 	return cmd
 }
 
-func commandForceBuild(log *slog.Logger, config *configs.Config) *cobra.Command {
+func commandForceBuild(log *slog.Logger, config *configs.Config, debug *bool) *cobra.Command {
 	var logEnabled bool
 
 	cmd := &cobra.Command{
@@ -122,7 +123,7 @@ func commandForceBuild(log *slog.Logger, config *configs.Config) *cobra.Command 
 		Run: func(cmd *cobra.Command, args []string) {
 			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
 			log = logCommandRun(cmd, logEnabled)
-			forceBuild(log, config)
+			forceBuild(log, config, debug)
 			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
 		},
 	}
@@ -131,7 +132,7 @@ func commandForceBuild(log *slog.Logger, config *configs.Config) *cobra.Command 
 	return cmd
 }
 
-func commandDown(log *slog.Logger, config *configs.Config) *cobra.Command {
+func commandDown(log *slog.Logger, config *configs.Config, debug *bool) *cobra.Command {
 	var logEnabled bool
 
 	cmd := &cobra.Command{
@@ -141,7 +142,7 @@ func commandDown(log *slog.Logger, config *configs.Config) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
 			log = logCommandRun(cmd, logEnabled)
-			down(log, config)
+			down(log, config, debug)
 			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
 		},
 	}
@@ -150,7 +151,7 @@ func commandDown(log *slog.Logger, config *configs.Config) *cobra.Command {
 	return cmd
 }
 
-func commandRestart(log *slog.Logger, config *configs.Config) *cobra.Command {
+func commandRestart(log *slog.Logger, config *configs.Config, debug *bool) *cobra.Command {
 	var logEnabled bool
 
 	cmd := &cobra.Command{
@@ -160,7 +161,7 @@ func commandRestart(log *slog.Logger, config *configs.Config) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
 			log = logCommandRun(cmd, logEnabled)
-			restart(log, config)
+			restart(log, config, debug)
 			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
 		},
 	}
@@ -169,7 +170,7 @@ func commandRestart(log *slog.Logger, config *configs.Config) *cobra.Command {
 	return cmd
 }
 
-func commandRebuild(log *slog.Logger, config *configs.Config) *cobra.Command {
+func commandRebuild(log *slog.Logger, config *configs.Config, debug *bool) *cobra.Command {
 	var logEnabled bool
 
 	cmd := &cobra.Command{
@@ -179,7 +180,7 @@ func commandRebuild(log *slog.Logger, config *configs.Config) *cobra.Command {
 		Run: func(cmd *cobra.Command, args []string) {
 			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
 			log = logCommandRun(cmd, logEnabled)
-			rebuild(log, config)
+			rebuild(log, config, debug)
 			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
 		},
 	}
@@ -188,7 +189,7 @@ func commandRebuild(log *slog.Logger, config *configs.Config) *cobra.Command {
 	return cmd
 }
 
-func commandForceRebuild(log *slog.Logger, config *configs.Config) *cobra.Command {
+func commandForceRebuild(log *slog.Logger, config *configs.Config, debug *bool) *cobra.Command {
 	var logEnabled bool
 
 	cmd := &cobra.Command{
@@ -198,7 +199,7 @@ func commandForceRebuild(log *slog.Logger, config *configs.Config) *cobra.Comman
 		Run: func(cmd *cobra.Command, args []string) {
 			clime.InfoLine(fmt.Sprintf(startCmdMsg, cmd.Use))
 			log = logCommandRun(cmd, logEnabled)
-			forceRebuild(log, config)
+			forceRebuild(log, config, debug)
 			clime.InfoLine(fmt.Sprintf(finishCmdMsg, cmd.Use))
 		},
 	}

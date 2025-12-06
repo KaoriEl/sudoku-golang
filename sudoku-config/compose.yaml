@@ -1,36 +1,17 @@
-version: "3.7"
+version: "3.9"
 
 services:
   traefik:
     image: traefik:2.11.31
-
+    container_name: "${PREFIX_CONTAINER_NAME}_traefik"
     hostname: traefik
-    container_name: traefik
-
     networks:
       - sudoku_network
-
     ports:
       - "127.0.0.1:8080:8080/tcp"
       - "80:80/tcp"
       - "443:443/tcp"
-      - "5173:5173/tcp"
-      - "16379:6379/tcp"
-      - "8000:8000/tcp"
-      - "25:25/tcp"
-      - "110:110/tcp"
-      - "143:143/tcp"
-      - "465:465/tcp"
-      - "587:587/tcp"
-      - "993:993/tcp"
-      - "995:995/tcp"
-      - "8443:8443/tcp"
-      - "8081:8081/tcp"
-      - "13306:13306/tcp"
-      - "13307:13307/tcp"
-
     restart: unless-stopped
-
     volumes:
       - /etc/localtime:/etc/localtime:ro,cached
       - /var/run/docker.sock:/var/run/docker.sock:ro,cached
@@ -38,26 +19,16 @@ services:
       - ./sudoku-config/traefik/traefik.yaml:/etc/traefik/traefik.yaml:ro,cached
 
   redis:
-    user: ${DOCKER_UID}:${DOCKER_GID}
     image: eqalpha/keydb:latest
-
+    container_name: "${PREFIX_CONTAINER_NAME}_redis"
     hostname: redis
-    container_name: redis
-
-    depends_on:
-      - traefik
-
     networks:
       - sudoku_network
-
     expose:
       - "6379/tcp"
-
     restart: unless-stopped
-
     volumes:
       - ./sudoku-config/redis/data:/data:delegated
-
     labels:
       - "traefik.enable=true"
       - "traefik.tcp.routers.redis.entrypoints=redis"
@@ -65,31 +36,20 @@ services:
       - "traefik.tcp.routers.redis.service=redis"
       - "traefik.tcp.services.redis.loadBalancer.server.port=6379"
 
-
   elasticsearch:
-    user: ${DOCKER_UID}:${DOCKER_GID}
     image: elasticsearch:9.1.8
-
+    container_name: "${PREFIX_CONTAINER_NAME}_elasticsearch"
     hostname: elasticsearch
-    container_name: elasticsearch
-
-    depends_on:
-      - traefik
-
     networks:
       - sudoku_network
-
     expose:
       - "9200/tcp"
-
     restart: unless-stopped
-
     volumes:
       - ./sudoku-config/elasticsearch/data:/usr/local/etc/elasticsearch/data:delegated
     environment:
       ES_JAVA_OPTS: -Xms512m -Xmx512m
       discovery.type: single-node
-
     labels:
       - "traefik.enable=true"
       - "traefik.tcp.routers.elasticsearch.entrypoints=elasticsearch"
@@ -97,28 +57,7 @@ services:
       - "traefik.tcp.routers.elasticsearch.service=elasticsearch"
       - "traefik.tcp.services.elasticsearch.loadBalancer.server.port=9200"
 
-  rabbitmq:
-    image: rabbitmq:4.2.1-management-alpine
-    restart: unless-stopped
-    environment:
-      - "RABBITMQ_DEFAULT_USER=default"
-      - "RABBITMQ_DEFAULT_PASS=default"
-    networks:
-      - sudoku_network
-    expose:
-      - "5672/tcp"
-    ports:
-      - "15672:15672"
-    labels:
-      - "traefik.enable=true"
-      - "traefik.tcp.routers.rabbitmq.entrypoints=rabbitmq"
-      - "traefik.tcp.routers.rabbitmq.rule=HostSNI(`*`)"
-      - "traefik.tcp.routers.rabbitmq.service=rabbitmq"
-      - "traefik.tcp.services.rabbitmq.loadBalancer.server.port=15672"
-
 networks:
   sudoku_network:
     name: sudoku_network
     driver: bridge
-    driver_opts:
-      com.docker.network.enable_ipv6: "false"
