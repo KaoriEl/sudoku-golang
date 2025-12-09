@@ -94,6 +94,21 @@ providers:
     directory: "/etc/traefik/custom"
     watch: true
 
+tcp:
+  routers:
+    pgsql_service_router:
+      entryPoints:
+        - pgsql_service
+      rule: "HostSNI(`*`)"
+      service: pgsql_service_service
+      tls: false
+
+  services:
+    pgsql_service_service:
+      loadBalancer:
+        servers:
+          - address: "pgsql_service:5432"
+
 log:
   level: INFO
   format: text
