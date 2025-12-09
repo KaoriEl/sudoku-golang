@@ -11,6 +11,7 @@ services:
       - "127.0.0.1:8080:8080/tcp"
       - "80:80/tcp"
       - "443:443/tcp"
+      - "127.0.0.1:5432:5432/tcp" # pgsql_instance
     restart: unless-stopped
     volumes:
       - /etc/localtime:/etc/localtime:ro,cached
