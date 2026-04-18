@@ -11,16 +11,13 @@ import (
 )
 
 const (
-	// Логи.
 	logEnabledMsg  = "«%s» command executed with logging enabled"
 	logDisabledMsg = "«%s» command executed with logging disabled"
 	logFlagDesc    = "Turn on detailed log"
 
-	// Старт/финиш команд.
 	startCmdMsg  = "Starting command «%s»"
 	finishCmdMsg = "Finish command «%s»..."
 
-	// Описания команд.
 	descBuild        = "Собирает все контейнеры"
 	descStart        = "Запускает собранные контейнеры"
 	descStop         = "Останавливает все контейнеры"
@@ -42,7 +39,6 @@ func logCommandRun(cmd *cobra.Command, logEnabled bool) *slog.Logger {
 	return newLog
 }
 
-// GetCommands теперь принимает указатель на глобальный флаг debug.
 func GetCommands(log *slog.Logger, config *configs.Config, debug *bool) []*cobra.Command {
 	return []*cobra.Command{
 		commandBuild(log, config, debug),

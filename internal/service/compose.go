@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sudoku-golang/internal/infra/configs"
+	"sync"
 
 	"github.com/alperdrsnn/clime"
 	"github.com/gammazero/workerpool"
@@ -20,8 +21,7 @@ type Composer struct {
 	progressBar           *clime.ProgressBar
 	currentProgress       int64
 	totalProgress         int64
-	projectName           string
-	cmd                   *exec.Cmd
+	mu                    sync.Mutex
 	wp                    *workerpool.WorkerPool
 	dockerComposeTemplate string
 	config                *configs.Config
@@ -77,7 +77,6 @@ func (c *Composer) FindComposeFiles() {
 func (c *Composer) setProgressBar(countFiles int) {
 	c.totalProgress = int64(countFiles)
 	c.currentProgress = 0
-	// В режиме debug не показываем прогресс-бар — логируем шаги явно
 	if c.Debug {
 		c.progressBar = nil
 		return
@@ -92,12 +91,14 @@ func (c *Composer) setProgressBar(countFiles int) {
 }
 
 func (c *Composer) addProgress(finishMessage string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.currentProgress += 1
 	if c.currentProgress > c.totalProgress {
 		c.currentProgress = c.totalProgress
 	}
 
-	// Если прогресс-бар не инициализирован (debug режим), просто логируем прогресс
 	if c.progressBar == nil {
 		c.log.Info("Progress update", "current", c.currentProgress, "total", c.totalProgress)
 		if c.currentProgress == c.totalProgress {
@@ -119,17 +120,15 @@ func (c *Composer) Build() {
 	c.setProgressBar(len(c.ComposeFiles))
 
 	for _, composeFile := range c.ComposeFiles {
-		c.setProjectName(composeFile)
-
 		buildCmd := "build"
 		if c.ForceRebuild {
 			buildCmd = "build --no-cache"
 		}
 
 		execCmd := fmt.Sprintf(c.dockerComposeTemplate+" %s", composeFile, buildCmd)
-		c.setCommand(execCmd)
+		cmd := c.buildCommand(execCmd)
 
-		if err := c.cmd.Run(); err != nil {
+		if err := cmd.Run(); err != nil {
 			fields := c.setLogFields(composeFile, execCmd)
 			c.log.Error("Ошибка выполнения команды сборки", slog.Any("error", err), slog.Any("fields", fields))
 		} else {
@@ -143,12 +142,10 @@ func (c *Composer) Start() {
 	c.setProgressBar(len(c.ComposeFiles))
 
 	for _, composeFile := range c.ComposeFiles {
-		c.setProjectName(composeFile)
-
 		execCmd := fmt.Sprintf(c.dockerComposeTemplate+" up -d", composeFile)
-		c.setCommand(execCmd)
+		cmd := c.buildCommand(execCmd)
 
-		if err := c.cmd.Run(); err != nil {
+		if err := cmd.Run(); err != nil {
 			fields := c.setLogFields(composeFile, execCmd)
 			c.log.Error("Ошибка выполнения команды запуска", slog.Any("error", err), slog.Any("fields", fields))
 		} else {
@@ -162,13 +159,12 @@ func (c *Composer) Stop() {
 	c.setProgressBar(len(c.ComposeFiles))
 
 	for _, composeFile := range c.ComposeFiles {
+		composeFile := composeFile
 		c.wp.Submit(func() {
-			c.setProjectName(composeFile)
-
 			execCmd := fmt.Sprintf(c.dockerComposeTemplate+" stop", composeFile)
-			c.setCommand(execCmd)
+			cmd := c.buildCommand(execCmd)
 
-			if err := c.cmd.Run(); err != nil {
+			if err := cmd.Run(); err != nil {
 				fields := c.setLogFields(composeFile, execCmd)
 				c.log.Error("Ошибка выполнения команды остановки", slog.Any("error", err), slog.Any("fields", fields))
 			} else {
@@ -184,13 +180,12 @@ func (c *Composer) Down() {
 	c.setProgressBar(len(c.ComposeFiles))
 
 	for _, composeFile := range c.ComposeFiles {
+		composeFile := composeFile
 		c.wp.Submit(func() {
-			c.setProjectName(composeFile)
-
 			execCmd := fmt.Sprintf(c.dockerComposeTemplate+" down", composeFile)
-			c.setCommand(execCmd)
+			cmd := c.buildCommand(execCmd)
 
-			if err := c.cmd.Run(); err != nil {
+			if err := cmd.Run(); err != nil {
 				fields := c.setLogFields(composeFile, execCmd)
 				c.log.Error("Ошибка выполнения команды остановки и удаления", slog.Any("error", err), slog.Any("fields", fields))
 			} else {
@@ -201,19 +196,16 @@ func (c *Composer) Down() {
 	c.wp.StopWait()
 }
 
-func (c *Composer) setCommand(execCmd string) {
+func (c *Composer) buildCommand(execCmd string) *exec.Cmd {
 	cmd := exec.Command("bash", "-c", execCmd)
 	cmd.Env = append(cmd.Env, c.EnvVars...)
-	c.cmd = cmd
 
 	if c.Debug {
-		c.log.Info("Executing command", "execCmd", execCmd)
+		c.log.Info("Executing command (buildCommand)", "execCmd", execCmd)
 		clime.InfoLine(fmt.Sprintf("[debug] %s", execCmd))
 	}
-}
 
-func (c *Composer) setProjectName(composeFile string) {
-	c.projectName = filepath.Base(filepath.Dir(composeFile))
+	return cmd
 }
 
 func (c *Composer) setLogFields(composeFile string, execCmd string) map[string]interface{} {
@@ -224,5 +216,5 @@ func (c *Composer) setLogFields(composeFile string, execCmd string) map[string]i
 }
 
 func (c *Composer) setDockerComposeTemplate() {
-	c.dockerComposeTemplate = c.config.DockerComposePath + " -f %s"
+	c.dockerComposeTemplate = c.config.DockerComposePath + " --file %s"
 }

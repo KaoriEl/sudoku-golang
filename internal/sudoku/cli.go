@@ -14,7 +14,6 @@ func Run(log *slog.Logger, cfg *configs.Config) error {
 	clime.InfoLine("Starting application...")
 	var debug bool
 	rootCmd := &cobra.Command{Use: "run"}
-	// глобальный флаг для логирования выполняемых shell-команд
 	rootCmd.PersistentFlags().BoolVar(&debug, "debug", false, "Log each executed shell command")
 	cmds := commands.GetCommands(log, cfg, &debug)
 	rootCmd.AddCommand(cmds...)
