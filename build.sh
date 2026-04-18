@@ -11,7 +11,7 @@ if [[ ! -f .env ]]; then
     die ".env не найден"
 fi
 
-sed -i 's/\r$//' .env
+sed -i '' 's/\r$//' .env
 
 ROOT_PROJECTS_FOLDER=$(grep -E '^ROOT_PROJECTS_FOLDER=' .env | cut -d '=' -f2- | xargs)
 if [[ -z "${ROOT_PROJECTS_FOLDER}" ]]; then
