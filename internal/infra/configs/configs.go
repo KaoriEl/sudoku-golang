@@ -3,6 +3,7 @@ package configs
 import (
 	"log/slog"
 	"os"
+	"runtime"
 	"strconv"
 
 	"github.com/joho/godotenv"
@@ -24,12 +25,11 @@ func MustLoad() (*Config, error) {
 
 	cfg := &Config{
 		DockerPath:         readValueFromFileOrEnv("DOCKER_PATH", "/usr/bin/env docker"),
-		DockerComposePath:  readValueFromFileOrEnv("DOCKER_COMPOSE_PATH", "/usr/bin/env docker compose"),
+		DockerComposePath:  readValueFromFileOrEnv("DOCKER_COMPOSE_PATH", defaultDockerComposePath()),
 		MaxWorkers:         readValueAsInt("MAX_WORKERS", 5),
 		RootProjectsFolder: readValueFromFileOrEnv("ROOT_PROJECTS_FOLDER", "projects"),
 	}
 
-	// Можно добавить валидацию конфига и возвращать ошибку, если что-то критично не найдено
 	return cfg, nil
 }
 
@@ -62,4 +62,11 @@ func readValueAsInt(valueName string, defaultValue int) int {
 		return defaultValue
 	}
 	return n
+}
+
+func defaultDockerComposePath() string {
+	if runtime.GOOS == "darwin" {
+		return "docker-compose"
+	}
+	return "/usr/bin/env docker-compose"
 }
