@@ -45,7 +45,8 @@ xattr -d com.apple.quarantine ./sudoku   # macOS only: the binary is not signed
 ./sudoku setup                           # Windows: .\sudoku.exe setup
 ```
 
-`setup` asks for your projects folder and the container prefix, shows what goes where, and installs:
+`setup` asks for your projects folder and the container prefix, finds `docker` and `docker compose` itself (shows the
+path and version — answer `n` to type your own; flags `--docker` / `--compose`), shows what goes where, and installs:
 
 | What | Where |
 |---|---|
@@ -58,7 +59,8 @@ Afterwards the downloaded archive can be deleted and `sudoku` works from any dir
 the infrastructure does not depend on it. Re-running `setup` is safe: existing files are kept (unless
 `--overwrite-env` / `--regenerate-compose`; old ones go to `.bak`). Unattended: `sudoku setup --root ~/projects
 --prefix dev --yes`. Updates: `sudoku update` (verifies the SHA-256 from the release's `checksums.txt`), no new
-`setup` needed.
+`setup` needed. The same from the admin: Settings → Version → "Check for updates" shows the new version and its notes,
+"Update to vX" downloads and verifies the release, then "Restart admin" — the page picks up the new version itself.
 
 **Moving from an old install** (binary, `.env`, `compose.yaml` and `sudoku-config/` inside the projects folder):
 `setup` finds it by itself — in the current directory, next to the binary and through Docker's containers — and
@@ -180,6 +182,11 @@ Features:
   process and offers to stop the conflicting container;
 * **Schedules**: periodic disk cleanup (build cache, dangling images, stopped containers) and update checks;
 * **Diagnostics**: the same checks as `sudoku doctor` on the settings page.
+* **Infrastructure**: an editor for `~/.sudoku/compose.yaml` and `traefik.yaml` in the admin — line numbers,
+  Tab/Shift+Tab, ⌘S/Ctrl+S, service templates (RabbitMQ, PostgreSQL, MySQL, MongoDB, Mailpit, appended to `services:`
+  with your prefix). Compose is checked with `docker compose config` on a copy next to the file before writing, the
+  previous version goes to `*.sudoku.bak`, and a save is refused if the file changed meanwhile (by hand or by the ports
+  page). "Save and apply": compose → `up -d` of the enabled infra services, traefik → recreate the traefik container.
 
 Security: the server listens only on loopback (`localhost`, `127.0.0.1`, `::1`) or a unix socket
 (`ADMIN_ADDR=unix:/path/sudoku.sock`, mode 0600), rejects cross-site requests (`Sec-Fetch-Site`, `Origin`, JSON-only

@@ -186,6 +186,7 @@ export interface AutostartStatus {
 
 export interface Settings {
   root: string;
+  canRestart: boolean;
   dockerPath: string;
   composePath: string;
   maxWorkers: number;
@@ -597,4 +598,48 @@ export interface LogLine {
   s: "out" | "err";
   m: string;
   c?: string;
+}
+
+export type InfraFileId = "compose" | "traefik";
+
+export interface InfraFile {
+  id: InfraFileId;
+  path: string;
+  exists: boolean;
+  content: string;
+  hash: string;
+  modTime: string;
+  hasBackup: boolean;
+}
+
+export interface InfraFilesView {
+  files: InfraFile[];
+}
+
+export interface InfraSaved {
+  file: InfraFile;
+  run?: Run;
+  applyError?: string;
+}
+
+export interface SelfRelease {
+  tag: string;
+  name: string;
+  url: string;
+  notes: string;
+  published: string;
+  hasAsset: boolean;
+}
+
+export interface SelfUpdateView {
+  current: string;
+  isRelease: boolean;
+  latest?: SelfRelease;
+  newer: boolean;
+  checkedAt?: string;
+  checkError?: string;
+  canApply: boolean;
+  reason?: string;
+  exe: string;
+  installed?: string;
 }

@@ -117,7 +117,7 @@ func commandUpdate(_ *app) *cobra.Command {
 				return err //nolint:wrapcheck // descriptive
 			}
 			clime.SuccessLine("Обновлено до " + rel.Tag + ": " + exe)
-			clime.InfoLine("Запущенную админку перезапустите (Настройки → сохранить конфиг, или перезапуск службы)")
+			clime.InfoLine("Запущенную админку перезапустите: Настройки → «Перезапустить админку» (или ⌘K)")
 			return nil
 		},
 	}

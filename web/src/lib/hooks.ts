@@ -106,7 +106,7 @@ export function usePref(key: string): [boolean, (v: boolean) => void] {
   return [value, update];
 }
 
-export type Route = "containers" | "monitoring" | "runs" | "backups" | "cleanup" | "ports" | "domains" | "settings";
+export type Route = "containers" | "monitoring" | "runs" | "backups" | "cleanup" | "ports" | "domains" | "infra" | "settings";
 
 const routePaths: Record<Route, string> = {
   containers: "/",
@@ -116,6 +116,7 @@ const routePaths: Record<Route, string> = {
   cleanup: "/cleanup",
   ports: "/ports",
   domains: "/domains",
+  infra: "/infra",
   settings: "/settings",
 };
 

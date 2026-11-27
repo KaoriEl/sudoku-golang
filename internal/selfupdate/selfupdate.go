@@ -51,6 +51,7 @@ type Release struct {
 	Name      string    `json:"name"`
 	Published time.Time `json:"published_at"`
 	URL       string    `json:"html_url"`
+	Body      string    `json:"body"`
 	Assets    []Asset   `json:"assets"`
 }
 

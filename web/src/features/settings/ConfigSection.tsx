@@ -10,47 +10,11 @@ import { CopyText } from "../../components/ui/CopyButton";
 import { Frame, SectionBar } from "../../components/ui/Frame";
 import { useToast } from "../../components/ui/Toasts";
 import { ru } from "../../i18n/ru";
+import { waitForOrigin, waitForRestart } from "../../lib/restart";
 
 const t = ru.configEditor;
 const iconProps = { size: 16, strokeWidth: 2, strokeLinecap: "square" as const };
 const ADDR = "ADMIN_ADDR";
-const POLL_MS = 500;
-const POLL_LIMIT = 60;
-
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
-
-// After a same-address restart the old server dies and a new one comes up on the same origin.
-async function waitForRestart(): Promise<boolean> {
-  await sleep(800);
-  for (let i = 0; i < POLL_LIMIT; i++) {
-    try {
-      const res = await fetch("/api/config", { cache: "no-store" });
-      if (res.ok) return true;
-    } catch {
-      /* still restarting */
-    }
-    await sleep(POLL_MS);
-  }
-  return false;
-}
-
-// A new origin can't be read (no CORS), but an opaque no-cors response proves the server is up.
-async function waitForOrigin(url: string): Promise<boolean> {
-  await sleep(800);
-  for (let i = 0; i < POLL_LIMIT; i++) {
-    try {
-      await fetch(`${url}/api/config`, { mode: "no-cors", cache: "no-store" });
-      return true;
-    } catch {
-      /* not yet */
-    }
-    await sleep(POLL_MS);
-  }
-  return false;
-}
-
 function SourceBadge({ f }: { f: ConfigField }) {
   if (f.source !== "env" && f.source !== "secret" && f.source !== "flag") return null;
   return (

@@ -121,3 +121,45 @@ func TestMigrate(t *testing.T) {
 		t.Fatalf("leftovers: %v / %v", known, other)
 	}
 }
+
+func TestDockerPathsRoundTrip(t *testing.T) {
+	root, home := t.TempDir(), t.TempDir()
+	t.Chdir(t.TempDir())
+	o := Options{
+		Home: home, Root: root, SkipBinary: true,
+		DockerPath:  `C:\Program Files\Docker\docker.exe`,
+		ComposePath: `"C:\Program Files\Docker\docker.exe" compose`,
+	}
+	if _, err := Run(o); err != nil {
+		t.Fatal(err)
+	}
+	env := filepath.Join(home, ".env")
+	if got := EnvValue(env, "DOCKER_PATH"); got != o.DockerPath {
+		t.Fatalf("DOCKER_PATH round trip: %q", got)
+	}
+	if got := EnvValue(env, "DOCKER_COMPOSE_PATH"); got != o.ComposePath {
+		t.Fatalf("DOCKER_COMPOSE_PATH round trip: %q", got)
+	}
+	o.ComposePath = "/usr/local/bin/docker-compose"
+	if _, err := Run(o); err != nil {
+		t.Fatal(err)
+	}
+	if got := EnvValue(env, "DOCKER_COMPOSE_PATH"); got != o.ComposePath {
+		t.Fatalf("patched compose: %q", got)
+	}
+}
+
+func TestComposeFor(t *testing.T) {
+	if got := ComposeFor("docker"); got != "docker compose" {
+		t.Fatal(got)
+	}
+}
+
+func TestCheckDockerRejectsOtherBinaries(t *testing.T) {
+	if _, err := CheckDocker("/bin/echo"); err == nil {
+		t.Fatal("echo accepted as docker")
+	}
+	if _, err := CheckDocker("/definitely/missing/docker"); err == nil {
+		t.Fatal("missing binary accepted")
+	}
+}

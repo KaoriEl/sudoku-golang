@@ -57,6 +57,8 @@ func commandSetup() *cobra.Command {
 	fl.StringVar(&f.o.Prefix, "prefix", "", "Префикс имён контейнеров инфраструктуры (по умолчанию "+defaultPrefix+")")
 	fl.StringVar(&f.o.Home, "home", "", "Папка настроек sudoku (по умолчанию "+displayPath(configs.DefaultHome())+", или $"+configs.HomeEnv+")")
 	fl.StringVar(&f.o.BinDir, "bin-dir", "", "Куда поставить бинарник (по умолчанию "+displayPath(setup.DefaultBinDir())+")")
+	fl.StringVar(&f.o.DockerPath, "docker", "", "Команда docker (DOCKER_PATH; по умолчанию находится автоматически)")
+	fl.StringVar(&f.o.ComposePath, "compose", "", "Команда compose (DOCKER_COMPOSE_PATH; по умолчанию находится автоматически)")
 	fl.BoolVar(&f.o.SkipBinary, "no-binary", false, "Не копировать бинарник")
 	fl.StringVar(&f.o.MigrateFrom, "migrate-from", "", "Перенести старую установку из этой папки")
 	fl.BoolVar(&f.noMigrate, "no-migrate", false, "Не искать и не переносить старую установку")
@@ -245,6 +247,7 @@ func runSetup(ctx context.Context, f *setupFlags) error {
 	if err := chooseRootAndPrefix(p, &o, legacy); err != nil {
 		return err
 	}
+	chooseDocker(p, &o, legacy)
 	printPlan(o, legacy)
 	if !p.confirm("Продолжить?", true) {
 		return errSetupCancelled
@@ -343,6 +346,85 @@ func chooseRootAndPrefix(p *prompter, o *setup.Options, legacy *legacyInstall) e
 	return nil
 }
 
+// chooseDocker fills DOCKER_PATH and DOCKER_COMPOSE_PATH: a flag wins, else the value already in .env
+// (if it still works), else what DetectDocker/DetectCompose find; the user may reject it and type their own.
+func chooseDocker(p *prompter, o *setup.Options, legacy *legacyInstall) {
+	existing := func(key string) string {
+		return firstNonEmpty(envOf(o.Home, key), valueOr(legacy, func(l *legacyInstall) string { return envOf(l.dir, key) }))
+	}
+	o.DockerPath = chooseCommand(p, commandChoice{
+		title: "docker", key: "DOCKER_PATH", flag: o.DockerPath, existing: existing("DOCKER_PATH"),
+		detect: setup.DetectDocker, check: setup.CheckDocker, example: "/usr/local/bin/docker",
+	})
+	dockerCmd := firstNonEmpty(o.DockerPath, configs.DefaultDockerPath)
+	o.ComposePath = chooseCommand(p, commandChoice{
+		title: "docker compose", key: "DOCKER_COMPOSE_PATH", flag: o.ComposePath, existing: existing("DOCKER_COMPOSE_PATH"),
+		detect: func() (string, string, bool) { return setup.DetectCompose(dockerCmd) },
+		check:  setup.CheckCompose, example: setup.ComposeFor(dockerCmd) + " или /usr/local/bin/docker-compose",
+	})
+}
+
+type commandChoice struct {
+	title, key, flag, existing, example string
+	detect                              func() (string, string, bool)
+	check                               func(string) (string, error)
+}
+
+func chooseCommand(p *prompter, c commandChoice) string {
+	if c.flag != "" {
+		if v, err := c.check(c.flag); err != nil {
+			clime.WarningLine(fmt.Sprintf("%s: %q не запускается (%v) — записываю как есть", c.title, c.flag, err))
+		} else {
+			clime.SuccessLine(fmt.Sprintf("%s: %s (версия %s)", c.title, c.flag, v))
+		}
+		return c.flag
+	}
+	found, version := "", ""
+	if c.existing != "" {
+		if v, err := c.check(c.existing); err == nil {
+			found, version = c.existing, v
+		} else {
+			clime.WarningLine(fmt.Sprintf("%s из .env (%s) не запускается: %v", c.key, c.existing, err))
+		}
+	}
+	if found == "" {
+		found, version, _ = c.detect()
+	}
+	if found != "" {
+		clime.InfoLine(fmt.Sprintf("Найден %s: %s (версия %s)", c.title, found, version))
+		if p.confirm("Использовать его?", true) {
+			return found
+		}
+	} else {
+		clime.WarningLine(c.title + " не найден автоматически")
+		if !p.on {
+			return ""
+		}
+	}
+	for {
+		v := p.ask(fmt.Sprintf("Команда или путь для %s (например %s; пусто — %s)", c.title, c.example, skipHint(found)), "")
+		if v == "" {
+			return found
+		}
+		ver, err := c.check(v)
+		if err == nil {
+			clime.SuccessLine(fmt.Sprintf("%s: %s (версия %s)", c.title, v, ver))
+			return v
+		}
+		clime.WarningLine(fmt.Sprintf("%q не запускается: %v", v, err))
+		if p.confirm("Всё равно записать?", false) {
+			return v
+		}
+	}
+}
+
+func skipHint(found string) string {
+	if found != "" {
+		return "оставить найденный"
+	}
+	return "значение по умолчанию"
+}
+
 func printPlan(o setup.Options, legacy *legacyInstall) {
 	fmt.Println()
 	clime.InfoLine("Будет установлено:")
@@ -355,6 +437,12 @@ func printPlan(o setup.Options, legacy *legacyInstall) {
 	fmt.Printf("  папка с проектами   %s\n", displayPath(o.Root))
 	if o.Prefix != "" {
 		fmt.Printf("  префикс контейнеров %s\n", o.Prefix)
+	}
+	if o.DockerPath != "" {
+		fmt.Printf("  docker              %s\n", o.DockerPath)
+	}
+	if o.ComposePath != "" {
+		fmt.Printf("  compose             %s\n", o.ComposePath)
 	}
 	if legacy != nil {
 		fmt.Printf("  перенос из          %s\n", legacy.dir)

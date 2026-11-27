@@ -74,6 +74,13 @@ func reexecArgs(dropAddrFlag bool) ([]string, []string, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("executable: %w", err)
 	}
+	// On Windows `sudoku update` renames the running exe to <name>.old and puts the new one in its
+	// place; os.Executable may report the renamed file — restart the new binary, not the old one.
+	if trimmed := strings.TrimSuffix(exe, ".old"); trimmed != exe {
+		if st, err := os.Stat(trimmed); err == nil && !st.IsDir() {
+			exe = trimmed
+		}
+	}
 	args := os.Args
 	if dropAddrFlag {
 		args = withoutFlag(args, "--addr")

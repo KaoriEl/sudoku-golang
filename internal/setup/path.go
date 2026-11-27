@@ -14,7 +14,7 @@ func InPath(dir string) bool {
 		if p == "" {
 			continue
 		}
-		if runtime.GOOS == goosWindows || runtime.GOOS == "darwin" {
+		if runtime.GOOS == goosWindows || runtime.GOOS == goosDarwin {
 			if strings.EqualFold(filepath.Clean(p), want) {
 				return true
 			}

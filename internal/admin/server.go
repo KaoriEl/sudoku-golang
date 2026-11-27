@@ -68,6 +68,12 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("POST /api/ports", s.handleAddPort)
 	mux.HandleFunc("POST /api/ports/remove", s.handleRemovePort)
 	mux.HandleFunc("POST /api/ports/apply", s.handleApplyPorts)
+	mux.HandleFunc("POST /api/restart", s.handleRestart)
+	mux.HandleFunc("GET /api/selfupdate", s.handleSelfUpdate)
+	mux.HandleFunc("POST /api/selfupdate/check", s.handleSelfUpdateCheck)
+	mux.HandleFunc("POST /api/selfupdate/apply", s.handleSelfUpdateApply)
+	mux.HandleFunc("GET /api/infra/files", s.handleInfraFiles)
+	mux.HandleFunc("POST /api/infra/files/{id}", s.handleSaveInfraFile)
 	mux.HandleFunc("POST /api/preflight", s.handlePreflight)
 	mux.HandleFunc("GET /api/domains", s.handleDomains)
 	mux.HandleFunc("POST /api/domains/hosts", s.handleWriteHosts)
@@ -182,13 +188,15 @@ func (s *Server) writeError(w http.ResponseWriter, err error) {
 		writeJSON(w, http.StatusForbidden, apiError{Error: err.Error(), Code: "not_managed"})
 	case errors.Is(err, ErrConfigInvalid):
 		writeJSON(w, http.StatusBadRequest, apiError{Error: err.Error(), Code: codeInvalid})
-	case errors.Is(err, errRestartBusy), errors.Is(err, errExclusiveBusy):
+	case errors.Is(err, errRestartBusy), errors.Is(err, errExclusiveBusy), errors.Is(err, errUpdating):
 		writeJSON(w, http.StatusConflict, apiError{Error: err.Error(), Code: "busy"})
 	case errors.Is(err, ErrRunInProgress):
 		writeJSON(w, http.StatusConflict, apiError{Error: err.Error(), Code: "run_in_progress"})
 	case errors.Is(err, errNotRunning):
 		writeJSON(w, http.StatusConflict, apiError{Error: err.Error(), Code: "not_running"})
-	case errors.Is(err, ErrPortConflict), errors.Is(err, ErrStale):
+	case errors.Is(err, ErrUnknownInfraFile):
+		writeJSON(w, http.StatusNotFound, apiError{Error: err.Error(), Code: "not_found"})
+	case errors.Is(err, ErrPortConflict), errors.Is(err, ErrStale), errors.Is(err, ErrStaleFile):
 		writeJSON(w, http.StatusConflict, apiError{Error: err.Error(), Code: "conflict"})
 	case errors.Is(err, ErrInvalidPort), errors.Is(err, errBadBody), errors.Is(err, ErrBadInterval),
 		errors.Is(err, composeedit.ErrInvalidName), errors.Is(err, composeedit.ErrEntryPointExists),
@@ -347,10 +355,17 @@ func (s *Server) ListenAndServe(ctx context.Context, addr string) error {
 
 var errBadBody = errors.New("invalid request body")
 
-const maxBodySize = 64 * 1024
+const (
+	maxBodySize     = 64 * 1024
+	maxFileBodySize = 1 << 20
+)
 
 func decodeBody(r *http.Request, v any) error {
-	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, maxBodySize))
+	return decodeBodyLimit(r, v, maxBodySize)
+}
+
+func decodeBodyLimit(r *http.Request, v any, limit int64) error {
+	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, limit))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {
 		return fmt.Errorf("%w: %w", errBadBody, err)
@@ -437,6 +452,65 @@ func (s *Server) handleApplyPorts(w http.ResponseWriter, _ *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusAccepted, run)
+}
+
+func (s *Server) handleSelfUpdate(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, s.svc.SelfUpdate())
+}
+
+func (s *Server) handleSelfUpdateCheck(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), snapshotTimeout)
+	defer cancel()
+	writeJSON(w, http.StatusOK, s.svc.CheckSelfUpdate(ctx))
+}
+
+func (s *Server) handleSelfUpdateApply(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Force bool `json:"force"`
+	}
+	if err := decodeBody(r, &body); err != nil {
+		s.writeError(w, err)
+		return
+	}
+	view, err := s.svc.ApplySelfUpdate(r.Context(), body.Force)
+	if err != nil {
+		s.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, view)
+}
+
+func (s *Server) handleRestart(w http.ResponseWriter, _ *http.Request) {
+	if err := s.svc.RestartAdmin(); err != nil {
+		s.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]bool{"restarting": true})
+}
+
+func (s *Server) handleInfraFiles(w http.ResponseWriter, _ *http.Request) {
+	view, err := s.svc.InfraFiles()
+	if err != nil {
+		s.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, view)
+}
+
+func (s *Server) handleSaveInfraFile(w http.ResponseWriter, r *http.Request) {
+	var req InfraSaveRequest
+	if err := decodeBodyLimit(r, &req, maxFileBodySize); err != nil {
+		s.writeError(w, err)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), snapshotTimeout+validateTimeout)
+	defer cancel()
+	saved, err := s.svc.SaveInfraFile(ctx, r.PathValue("id"), req)
+	if err != nil {
+		s.writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, saved)
 }
 
 func (s *Server) handleSettings(w http.ResponseWriter, _ *http.Request) {

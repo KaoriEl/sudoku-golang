@@ -31,6 +31,7 @@ type Settings struct {
 	Version       version.Info         `json:"version"`
 	Auth          AuthSettings         `json:"auth"`
 	Endpoint      string               `json:"endpoint"`
+	CanRestart    bool                 `json:"canRestart"`
 }
 
 type MetricsSettings struct {
@@ -185,10 +186,11 @@ func (s *Service) Settings() Settings {
 			NextUpdates: next(p.Schedule.Updates.LastRun, p.Schedule.Updates.EveryHours, p.Schedule.Updates.Enabled),
 			CacheModes:  cleanup.CacheAges,
 		},
-		Backups:  BackupSettings{Keep: p.Backups.Keep, Dir: p.BackupDir(s.layout.Data)},
-		Version:  version.Get(),
-		Auth:     AuthSettings{Token: s.authToken != "", Socket: s.unixSocket},
-		Endpoint: s.engine.Socket(),
+		Backups:    BackupSettings{Keep: p.Backups.Keep, Dir: p.BackupDir(s.layout.Data)},
+		Version:    version.Get(),
+		Auth:       AuthSettings{Token: s.authToken != "", Socket: s.unixSocket},
+		Endpoint:   s.engine.Socket(),
+		CanRestart: s.restart != nil,
 	}
 }
 

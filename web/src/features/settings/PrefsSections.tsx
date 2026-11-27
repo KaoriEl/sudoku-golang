@@ -11,6 +11,7 @@ import { Frame, SectionBar } from "../../components/ui/Frame";
 import { useToast } from "../../components/ui/Toasts";
 import { rf } from "../../i18n/ru.features";
 import { absolute } from "../../lib/format";
+import { SelfUpdate } from "./SelfUpdate";
 
 const t = rf.prefs;
 const TIMEOUTS = [30, 60, 120, 180, 300, 600, 900, 1800];
@@ -222,9 +223,7 @@ export function PrefsSections({ s }: { s: Settings }) {
               {s.auth.socket && <span className="meta"> · {t.socket}</span>}
             </dd>
           </dl>
-          <p className="meta">
-            {t.updateHint} <CopyText value="sudoku update" className="mono" />
-          </p>
+          <SelfUpdate canRestart={s.canRestart} />
         </div>
       </Frame>
 

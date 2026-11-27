@@ -20,7 +20,7 @@ func PathHint(dir string) (string, string) {
 	case "zsh":
 		return filepath.Join(h, ".zshrc"), pathLine(dir, "zsh")
 	case "bash":
-		if runtime.GOOS == "darwin" {
+		if runtime.GOOS == goosDarwin {
 			return filepath.Join(h, ".bash_profile"), pathLine(dir, "bash")
 		}
 		return filepath.Join(h, ".bashrc"), pathLine(dir, "bash")

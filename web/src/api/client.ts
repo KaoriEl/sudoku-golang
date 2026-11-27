@@ -12,6 +12,10 @@ import type {
   Container,
   ContainerAction,
   ContainerCommands,
+  InfraFileId,
+  InfraFilesView,
+  InfraSaved,
+  SelfUpdateView,
   HostMetrics,
   ToggleResult,
   PortsView,
@@ -75,6 +79,13 @@ export const api = {
   removePort: (index: number, raw: string, removeEntryPoint: boolean) =>
     request<PortsView>("/api/ports/remove", "POST", { index, raw, removeEntryPoint }),
   applyPorts: () => request<Run>("/api/ports/apply", "POST"),
+  selfUpdate: () => request<SelfUpdateView>("/api/selfupdate"),
+  checkSelfUpdate: () => request<SelfUpdateView>("/api/selfupdate/check", "POST"),
+  applySelfUpdate: (force: boolean) => request<SelfUpdateView>("/api/selfupdate/apply", "POST", { force }),
+  restartAdmin: () => request<{ restarting: boolean }>("/api/restart", "POST"),
+  infraFiles: () => request<InfraFilesView>("/api/infra/files"),
+  saveInfraFile: (id: InfraFileId, body: { content: string; hash: string; apply: boolean }) =>
+    request<InfraSaved>(`/api/infra/files/${id}`, "POST", body),
   settings: () => request<Settings>("/api/settings"),
   setAutostart: (enabled: boolean) => request<Settings>("/api/settings/autostart", "POST", { enabled }),
   setMetrics: (update: { background?: boolean; liveInterval?: number; backgroundInterval?: number }) =>

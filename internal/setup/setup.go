@@ -18,6 +18,8 @@ import (
 	sudokugolang "sudoku-golang"
 	"sudoku-golang/internal/fsutil"
 	"sudoku-golang/internal/infra/configs"
+
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -26,6 +28,7 @@ const (
 	envName     = configs.EnvFileName
 	backupsDir  = "backups"
 	goosWindows = "windows"
+	goosDarwin  = "darwin"
 )
 
 var (
@@ -43,7 +46,10 @@ type Options struct {
 	SkipBinary bool
 	// MigrateFrom is an old install (compose.yaml + sudoku-config/ inside the projects folder) whose
 	// infra, configs, data and backups are moved into Home. Its containers must be removed first.
-	MigrateFrom       string
+	MigrateFrom string
+	// DockerPath / ComposePath go into .env when set (DOCKER_PATH, DOCKER_COMPOSE_PATH).
+	DockerPath        string
+	ComposePath       string
 	OverwriteEnv      bool
 	RegenerateCompose bool
 }
@@ -193,9 +199,9 @@ func Run(o Options) ([]Step, error) {
 // existing one so the rest of the user's settings survive.
 func writeEnv(r *report, target, root string, o Options) error {
 	if exists(target) && !o.OverwriteEnv {
-		return patchEnvFile(r, target, root, o.Prefix)
+		return patchEnvFile(r, target, envKeys(root, o))
 	}
-	content, err := envContent(root, o.Prefix)
+	content, err := envContent(envKeys(root, o))
 	if err != nil {
 		return err
 	}
@@ -209,20 +215,41 @@ func writeEnv(r *report, target, root string, o Options) error {
 	return nil
 }
 
-func patchEnvFile(r *report, target, root, prefix string) error {
+type envKey struct{ key, value string }
+
+// envKeys are the .env keys setup sets: the projects folder always, the rest when chosen.
+func envKeys(root string, o Options) []envKey {
+	keys := []envKey{{"ROOT_PROJECTS_FOLDER", root}}
+	for _, k := range []envKey{{"PREFIX_CONTAINER_NAME", o.Prefix}, {"DOCKER_PATH", o.DockerPath}, {"DOCKER_COMPOSE_PATH", o.ComposePath}} {
+		if k.value != "" {
+			keys = append(keys, k)
+		}
+	}
+	return keys
+}
+
+func applyKeys(raw []byte, keys []envKey) []byte {
+	for _, k := range keys {
+		raw = setEnvKey(raw, k.key, k.value, true)
+	}
+	return raw
+}
+
+func patchEnvFile(r *report, target string, keys []envKey) error {
 	raw, err := os.ReadFile(target)
 	if err != nil {
 		return fmt.Errorf("read %s: %w", target, err)
 	}
-	out := setEnvKey(raw, "ROOT_PROJECTS_FOLDER", root, true)
-	keys := "ROOT_PROJECTS_FOLDER"
-	if prefix != "" {
-		out = setEnvKey(out, "PREFIX_CONTAINER_NAME", prefix, true)
-		keys += ", PREFIX_CONTAINER_NAME"
-	}
+	out := applyKeys(raw, keys)
 	if bytes.Equal(out, raw) {
 		r.add(false, ".env без изменений", target)
 		return nil
+	}
+	changed := []string{}
+	for _, k := range keys {
+		if envValueIn(raw, k.key) != k.value {
+			changed = append(changed, k.key)
+		}
 	}
 	if err := backup(target); err != nil {
 		return err
@@ -230,7 +257,7 @@ func patchEnvFile(r *report, target, root, prefix string) error {
 	if err := fsutil.WriteFileAtomicNoBackup(target, out); err != nil {
 		return err //nolint:wrapcheck // descriptive
 	}
-	r.add(true, ".env обновлён ("+keys+")", target)
+	r.add(true, ".env обновлён ("+strings.Join(changed, ", ")+")", target)
 	return nil
 }
 
@@ -340,26 +367,22 @@ func copySelf(target string) (bool, error) {
 
 // envContent is the repository's .env if the current directory has one (CRLF stripped, like
 // build.sh did with sed), otherwise the embedded template filled with root and prefix.
-func envContent(root, prefix string) ([]byte, error) {
+func envContent(keys []envKey) ([]byte, error) {
 	if wd, err := os.Getwd(); err == nil && configs.IsSudokuEnv(wd) {
 		raw, err := os.ReadFile(filepath.Join(wd, envName))
 		if err != nil {
 			return nil, fmt.Errorf("read .env: %w", err)
 		}
 		raw = bytes.ReplaceAll(raw, []byte("\r\n"), []byte("\n"))
-		return setEnvKey(raw, "ROOT_PROJECTS_FOLDER", root, false), nil
+		return applyKeys(raw, keys), nil
 	}
 	raw, err := sudokugolang.Defaults.ReadFile(".env.example")
 	if err != nil {
 		return nil, fmt.Errorf("env template: %w", err)
 	}
-	out := setEnvKey(raw, "ROOT_PROJECTS_FOLDER", root, true)
-	out = setEnvKey(out, "DOCKER_PATH", "docker", true)
-	out = setEnvKey(out, "DOCKER_COMPOSE_PATH", "docker compose", true)
-	if prefix != "" {
-		out = setEnvKey(out, "PREFIX_CONTAINER_NAME", prefix, true)
-	}
-	return out, nil
+	raw = setEnvKey(raw, "DOCKER_PATH", "docker", true)
+	raw = setEnvKey(raw, "DOCKER_COMPOSE_PATH", "docker compose", true)
+	return applyKeys(raw, keys), nil
 }
 
 func envLine(key, value string) string {
@@ -399,12 +422,15 @@ func envValue(path, key string) string {
 	if err != nil {
 		return ""
 	}
-	for _, l := range strings.Split(string(raw), "\n") {
-		if k, v, ok := strings.Cut(strings.TrimSpace(l), "="); ok && strings.TrimSpace(k) == key {
-			return strings.Trim(strings.TrimSpace(v), `"'`)
-		}
+	return envValueIn(raw, key)
+}
+
+func envValueIn(raw []byte, key string) string {
+	values, err := godotenv.UnmarshalBytes(raw)
+	if err != nil {
+		return ""
 	}
-	return ""
+	return values[key]
 }
 
 // extractConfig fills target with the default sudoku-config (./sudoku-config when run from the

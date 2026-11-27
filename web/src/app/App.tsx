@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Activity, Boxes, Command, DatabaseBackup, Eraser, History, Moon, Network, Play, RotateCw, ScrollText, Settings2, Square, Sun } from "lucide-react";
+import { Activity, Boxes, Command, DatabaseBackup, Eraser, FileCog, History, Moon, Network, Play, RotateCw, ScrollText, Settings2, Square, Sun } from "lucide-react";
 import { ApiError, api } from "../api/client";
 import type { Alert, BulkAction, Container, ContainerAction, Run, SelectionAction, SelectionTarget, Snapshot } from "../api/types";
 import { ProductMark } from "../components/hud/ProductMark";
@@ -16,6 +16,8 @@ import { MonitoringPage } from "../features/monitoring/MonitoringPage";
 import { PortsPage } from "../features/ports/PortsPage";
 import { BackupsPage } from "../features/backups/BackupsPage";
 import { DomainsPage } from "../features/network/DomainsPage";
+import { InfraPage } from "../features/infra/InfraPage";
+import { useRestartAdmin } from "../features/settings/useRestartAdmin";
 import { usePreflight } from "../features/preflight/Preflight";
 import { RunsPage } from "../features/runs/RunsPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
@@ -61,6 +63,7 @@ export function App() {
   const [paletteConfirm, setPaletteConfirm] = useState<BulkAction | null>(null);
   const [guard, preflightDialog] = usePreflight();
   const settings = useQuery({ queryKey: ["settings"], queryFn: api.settings, staleTime: 60_000 });
+  const restartAdmin = useRestartAdmin();
   const browserNotify = settings.data?.notifications.browser ?? true;
 
   const onAlert = useCallback(
@@ -213,6 +216,7 @@ export function App() {
     { route: "runs", label: rf.nav.runs, jp: rf.nav.runsJp, icon: <History {...iconProps} aria-hidden /> },
     { route: "backups", label: rf.nav.backups, jp: rf.nav.backupsJp, icon: <DatabaseBackup {...iconProps} aria-hidden /> },
     { route: "ports", label: rf.nav.network, jp: rf.nav.networkJp, icon: <Network {...iconProps} aria-hidden />, also: ["domains"] },
+    { route: "infra", label: rf.nav.infra, jp: rf.nav.infraJp, icon: <FileCog {...iconProps} aria-hidden /> },
     { route: "cleanup", label: ru.cleanup.nav, jp: ru.cleanup.navJp, icon: <Eraser {...iconProps} aria-hidden /> },
     { route: "settings", label: ru.navMore.settings, jp: ru.navMore.settingsJp, icon: <Settings2 {...iconProps} aria-hidden /> },
   ];
@@ -244,6 +248,10 @@ export function App() {
       { id: "act-backups", group: "actions", label: rf.palette.backupAll, icon: <DatabaseBackup {...iconProps} aria-hidden />, run: () => go("backups") },
       { id: "act-doctor", group: "actions", label: rf.palette.doctor, hint: "sudoku doctor", icon: <Settings2 {...iconProps} aria-hidden />, run: () => go("settings") },
     );
+    items.push({ id: "act-selfupdate", group: "actions", label: rf.prefs.check, hint: "sudoku update", icon: <RotateCw {...iconProps} aria-hidden />, run: () => go("settings") });
+    if (settings.data?.canRestart) {
+      items.push({ id: "act-restart-admin", group: "actions", label: rf.prefs.restart, icon: <RotateCw {...iconProps} aria-hidden />, run: restartAdmin.restart });
+    }
     for (const c of managed) {
       const kw = `${c.service} ${c.project} ${c.name}`;
       const up = c.state === "running";
@@ -258,7 +266,7 @@ export function App() {
       );
     }
     return items;
-  }, [managed, navItems]);
+  }, [managed, navItems, settings.data?.canRestart, restartAdmin.restart]);
 
 
   return (
@@ -375,6 +383,8 @@ export function App() {
           <PortsPage bulkBusy={bulkBusy} onRunStarted={onRunStarted} go={go} href={href} />
         ) : route === "domains" ? (
           <DomainsPage go={go} href={href} />
+        ) : route === "infra" ? (
+          <InfraPage bulkBusy={bulkBusy} onRunStarted={onRunStarted} />
         ) : route === "runs" ? (
           <RunsPage
             onOpen={(r) => {

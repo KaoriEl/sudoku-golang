@@ -61,6 +61,10 @@ type Service struct {
 	authToken  string
 	unixSocket bool
 
+	selfUpd    selfUpdater
+	exe        func() (string, error)
+	selfUpdate selfUpdateState
+
 	restart      Restarter
 	addrFromFlag bool
 }
