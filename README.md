@@ -189,8 +189,11 @@ sudoku exec billing/db -- psql -U postgres
   расписанию;
 * **Диагностика** — то же, что `sudoku doctor`, на странице «Настройки».
 * **Инфраструктура** — редактор `~/.sudoku/compose.yaml` и `traefik.yaml` прямо в админке: номера строк, Tab/Shift+Tab,
-  ⌘S/Ctrl+S, шаблоны сервисов (RabbitMQ, PostgreSQL, MySQL, MongoDB, Mailpit — встают в конец `services:` с вашим
-  префиксом). Перед записью compose проверяется `docker compose config` на копии рядом с файлом, старая версия
+  ⌘S/Ctrl+S, 28 шаблонов сервисов по группам — очереди (RabbitMQ, NATS, Kafka + Kafka UI, Centrifugo), базы и кэши
+  (PostgreSQL, MySQL, MariaDB, MongoDB, ClickHouse, Valkey, Memcached), поиск (Meilisearch, OpenSearch, Typesense,
+  Qdrant), хранилища (SeaweedFS S3, LocalStack), мониторинг (Jaeger, Prometheus, Grafana), инструменты (Mailpit, Adminer,
+  pgAdmin, Mongo Express, Redis Insight, Keycloak, Ollama). Шаблон встаёт в конец `services:` с вашим префиксом,
+  зависимости добавляются сами, веб-интерфейсы открываются на `http://<имя>.localhost`. Перед записью compose проверяется `docker compose config` на копии рядом с файлом, старая версия
   сохраняется в `*.sudoku.bak`, а если файл успели поменять (руками или на странице портов) — сохранение отклоняется,
   чтобы не затереть чужие правки. «Сохранить и применить»: для compose — `up -d` включённых сервисов инфраструктуры,
   для traefik — пересоздание контейнера traefik.

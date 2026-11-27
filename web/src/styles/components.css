@@ -2795,14 +2795,46 @@ select option {
 }
 
 .infra-snippets {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--s-1) var(--s-2);
+  display: grid;
+  gap: var(--s-2);
+  padding: var(--s-2) var(--s-3);
+  border: 1px solid var(--line);
 }
 
-.infra-snippets .field-label {
-  margin-right: var(--s-1);
+.infra-snippets summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--s-2);
+  cursor: pointer;
+}
+
+.infra-snippet-group {
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr);
+  align-items: center;
+  gap: var(--s-2);
+}
+
+.infra-snippet-title {
+  font-family: var(--font-display);
+  font-size: var(--t-micro);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.infra-snippet-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s-1);
+}
+
+.infra-snippet-list .is-present {
+  opacity: .45;
+}
+
+@media (max-width: 767px) {
+  .infra-snippet-group { grid-template-columns: minmax(0, 1fr); }
 }
 
 .code-editor {

@@ -11,7 +11,7 @@ import { Frame, SectionBar } from "../../components/ui/Frame";
 import { useToast } from "../../components/ui/Toasts";
 import { ru } from "../../i18n/ru";
 import { rf } from "../../i18n/ru.features";
-import { detectPrefix, insertService, snippets } from "./snippets";
+import { detectPrefix, hasService, insertWithDeps, snippetGroups, snippets } from "./snippets";
 
 const t = rf.infra;
 const iconProps = { size: 14, strokeWidth: 2, strokeLinecap: "square" as const };
@@ -215,14 +215,14 @@ export function InfraPage({ bulkBusy, onRunStarted }: { bulkBusy: boolean; onRun
     const s = snippets.find((x) => x.id === id);
     if (!s) return;
     const current = draftOf(file).text;
-    const res = insertService(current, s.id, s.body(detectPrefix(current)));
+    const res = insertWithDeps(current, s.id, detectPrefix(current));
     if (res.kind === "exists") {
       toast({ tone: "danger", message: t.snippetExists(s.id) });
       return;
     }
     setText(file.id, res.text);
     setSelection({ start: res.start, end: res.end, seq: Date.now() });
-    toast({ tone: "success", message: t.snippetAdded(s.label), detail: t.snippetNotes[s.id] });
+    toast({ tone: "success", message: t.snippetAdded(res.added.join(", ")), detail: t.snippetNotes[s.id] });
   };
 
   if (!q.data || !file) {
@@ -275,22 +275,39 @@ export function InfraPage({ bulkBusy, onRunStarted }: { bulkBusy: boolean; onRun
           )}
 
           {file.id === "compose" && (
-            <div className="infra-snippets" role="group" aria-label={t.templates}>
-              <span className="field-label">{t.templates}</span>
-              {snippets.map((s) => (
-                <Button
-                  key={s.id}
-                  size="sm"
-                  variant="ghost"
-                  icon={<Plus {...iconProps} />}
-                  title={`${t.templatesHint}: ${t.snippetNotes[s.id] ?? ""}`}
-                  disabled={busy}
-                  onClick={() => addSnippet(s.id)}
-                >
-                  {s.label}
-                </Button>
+            <details className="infra-snippets" open>
+              <summary>
+                <span className="field-label">{t.templates}</span>
+                <span className="meta micro">{t.templatesCount(snippets.length)}</span>
+              </summary>
+              <p className="meta micro">{t.templatesNote}</p>
+              {snippetGroups.map((g) => (
+                <div key={g} className="infra-snippet-group" role="group" aria-label={t.groups[g]}>
+                  <span className="infra-snippet-title">{t.groups[g]}</span>
+                  <div className="infra-snippet-list">
+                    {snippets
+                      .filter((s) => s.group === g)
+                      .map((s) => {
+                        const present = hasService(draft.text, s.id);
+                        return (
+                          <Button
+                            key={s.id}
+                            size="sm"
+                            variant="ghost"
+                            className={present ? "is-present" : ""}
+                            icon={<Plus {...iconProps} />}
+                            title={present ? t.snippetExists(s.id) : `${t.templatesHint}: ${t.snippetNotes[s.id] ?? ""}`}
+                            disabled={busy || present}
+                            onClick={() => addSnippet(s.id)}
+                          >
+                            {s.label}
+                          </Button>
+                        );
+                      })}
+                  </div>
+                </div>
               ))}
-            </div>
+            </details>
           )}
 
           <CodeEditor

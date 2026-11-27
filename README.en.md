@@ -183,8 +183,11 @@ Features:
 * **Schedules**: periodic disk cleanup (build cache, dangling images, stopped containers) and update checks;
 * **Diagnostics**: the same checks as `sudoku doctor` on the settings page.
 * **Infrastructure**: an editor for `~/.sudoku/compose.yaml` and `traefik.yaml` in the admin — line numbers,
-  Tab/Shift+Tab, ⌘S/Ctrl+S, service templates (RabbitMQ, PostgreSQL, MySQL, MongoDB, Mailpit, appended to `services:`
-  with your prefix). Compose is checked with `docker compose config` on a copy next to the file before writing, the
+  Tab/Shift+Tab, ⌘S/Ctrl+S, 28 grouped service templates (queues: RabbitMQ, NATS, Kafka + Kafka UI, Centrifugo; databases:
+  PostgreSQL, MySQL, MariaDB, MongoDB, ClickHouse, Valkey, Memcached; search: Meilisearch, OpenSearch, Typesense, Qdrant;
+  storage: SeaweedFS S3, LocalStack; observability: Jaeger, Prometheus, Grafana; tools: Mailpit, Adminer, pgAdmin,
+  Mongo Express, Redis Insight, Keycloak, Ollama), appended to `services:` with your prefix, dependencies added
+  automatically, web UIs on `http://<name>.localhost`). Compose is checked with `docker compose config` on a copy next to the file before writing, the
   previous version goes to `*.sudoku.bak`, and a save is refused if the file changed meanwhile (by hand or by the ports
   page). "Save and apply": compose → `up -d` of the enabled infra services, traefik → recreate the traefik container.
 
