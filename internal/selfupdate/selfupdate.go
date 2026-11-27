@@ -135,7 +135,8 @@ func Newer(current, latest string) bool {
 	return false
 }
 
-// AssetFor picks the archive built for goos/goarch ("sudoku_1.2.3_linux_amd64.tar.gz").
+// AssetFor picks the archive built for goos/goarch ("sudoku_linux_amd64.tar.gz"; older releases had the
+// version in the name, "sudoku_1.2.3_linux_amd64.tar.gz" — both match).
 func (r Release) AssetFor(goos, goarch string) (Asset, bool) {
 	want := "_" + goos + "_" + goarch + "."
 	for _, a := range r.Assets {

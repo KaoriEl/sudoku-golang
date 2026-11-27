@@ -1,304 +1,306 @@
 <p align="center">
-  <img src="img/logo.png" alt="Sudoku Golang CLI Logo" width="250"/>
+  <img src="img/logo.png" alt="sudoku" width="220"/>
 </p>
 
-📘 Documentation available in other languages:
+<p align="center">🇷🇺 <a href="README.md">Русская версия</a></p>
 
-* 🇬🇧 [Русский](README.md)
+**sudoku** runs a local development environment built from Docker Compose: shared infrastructure (Traefik, Redis,
+Elasticsearch and whatever you add) plus projects, each with its own `compose-sudoku.yaml`. One command starts
+everything in the right order, and the built-in web admin shows state, logs and resource usage and lets you manage
+containers without a terminal.
 
----
+A single dependency-free binary for macOS, Linux and Windows. All it needs is Docker.
 
-## Description 📝
+<p align="center">
+  <img src="img/screenshots/containers.webp" alt="Container list in the admin" width="900"/>
+</p>
 
-This project is a CLI tool written in Go for managing infrastructure and services related to Sudoku via `docker-compose`. It allows you to conveniently build, start, stop, and rebuild containers through a set of commands.
+The admin UI is in Russian.
 
-## Table of Contents 📑
+## Contents
 
-* [Description](#description)
-* [Requirements](#requirements)
-* [Installation and Build](#installation-and-build)
-* [Available Commands](#available-commands)
-* [Web admin](#web-admin)
+* [How it works](#how-it-works)
+* [Installation](#installation)
+  * [macOS](#macos) · [Linux](#linux) · [Windows](#windows)
+  * [What setup asks](#what-setup-asks)
+  * [Updating](#updating) · [Moving from an old install](#moving-from-an-old-install) · [Uninstalling](#uninstalling)
+  * [Building from source](#building-from-source)
+* [Commands](#commands)
+* [Admin](#admin)
 * [Configuration](#configuration)
 * [Infrastructure](#infrastructure)
-    * [Services](#services)
-        * [Traefik](#traefik)
-        * [Redis (KeyDB)](#redis-keydb)
-        * [Elasticsearch](#elasticsearch)
-        * [RabbitMQ](#rabbitmq)
-    * [Network](#network)
-* [Project Structure](#project-structure)
+* [Security](#security)
+* [Development](#development)
 
----
+## How it works
 
-## Installation and Build ⚙️
+You have a folder with your projects. A project that sudoku should manage contains a `compose-sudoku.yaml`:
 
-sudoku runs on **Linux, macOS and Windows** (amd64 and arm64): a single dependency-free binary with the admin
-panel embedded. All it needs is Docker (Docker Desktop, Colima, OrbStack, Rancher Desktop or dockerd) with compose
-(`docker compose` or `docker-compose`).
-
-**Release binary** (recommended): download the archive for your platform from the releases page
-(`darwin_arm64` — Apple Silicon Mac, `darwin_amd64` — Intel Mac, `linux_*`, `windows_*`), unpack it and run
-
-```sh
-xattr -d com.apple.quarantine ./sudoku   # macOS only: the binary is not signed
-./sudoku setup                           # Windows: .\sudoku.exe setup
+```
+~/projects/                     ← projects folder (ROOT_PROJECTS_FOLDER)
+├── shop/compose-sudoku.yaml
+├── billing/compose-sudoku.yaml
+└── blog/compose-sudoku.yaml
 ```
 
-`setup` asks for your projects folder and the container prefix, finds `docker` and `docker compose` itself (shows the
-path and version — answer `n` to type your own; flags `--docker` / `--compose`), shows what goes where, and installs:
+Shared services used by all projects live in a separate `compose.yaml` in the sudoku folder (`~/.sudoku`). All
+containers share the `sudoku_network` network, so a project reaches the infrastructure by service name:
+`redis:6379`, `postgres:5432`. Traefik serves web UIs on addresses like `http://shop.localhost`.
 
-| What | Where |
-|---|---|
-| the `sudoku` command | `~/.local/bin` (Windows: `%LOCALAPPDATA%\Programs\sudoku`), offers to add it to PATH |
-| `.env`, the infrastructure `compose.yaml`, `sudoku-config/`, backups | `~/.sudoku` (or `$SUDOKU_HOME`) |
-| your projects | stay where they are: `<projects folder>/<project>/compose-sudoku.yaml` |
+`sudoku start` brings up the infrastructure, waits for its healthchecks and then starts the projects. You can also
+start single projects, services or saved sets.
 
-Afterwards the downloaded archive can be deleted and `sudoku` works from any directory: `sudoku doctor`,
-`sudoku start`, `sudoku serve`. The projects folder can be changed at any time (`sudoku setup` or the admin settings);
-the infrastructure does not depend on it. Re-running `setup` is safe: existing files are kept (unless
-`--overwrite-env` / `--regenerate-compose`; old ones go to `.bak`). Unattended: `sudoku setup --root ~/projects
---prefix dev --yes`. Updates: `sudoku update` (verifies the SHA-256 from the release's `checksums.txt`), no new
-`setup` needed. The same from the admin: Settings → Version → "Check for updates" shows the new version and its notes,
-"Update to vX" downloads and verifies the release, then "Restart admin" — the page picks up the new version itself.
+## Installation
 
-**Moving from an old install** (binary, `.env`, `compose.yaml` and `sudoku-config/` inside the projects folder):
-`setup` finds it by itself — in the current directory, next to the binary and through Docker's containers — and
-offers to move it into `~/.sudoku` together with the data (`sudoku-config/*/data`, backups). Infrastructure containers
-are recreated from the new place; `sudoku_network` and project containers are left alone. Explicitly:
-`sudoku setup --migrate-from <dir>`. The old layout keeps working without moving.
+Install Docker with Compose first: [Docker Desktop](https://www.docker.com/products/docker-desktop/), Colima,
+OrbStack, Rancher Desktop or Docker Engine on Linux. Make sure `docker ps` and `docker compose version` work.
 
-**From source** (needs Go and Node.js/npm):
+Then download sudoku for your system and run `setup`. It asks a couple of questions and puts everything in place.
+
+### macOS
 
 ```sh
-git clone … && cd sudoku-golang
-cp .env.example .env        # optional: template for ~/.sudoku/.env (ROOT_PROJECTS_FOLDER, PREFIX_CONTAINER_NAME)
-make build                  # UI + binary + `sudoku setup` (OVERWRITE_ENV=1 / REGENERATE_COMPOSE=1 to overwrite)
+# Apple Silicon (M1–M4). For an Intel Mac replace arm64 with amd64.
+curl -fsSL https://github.com/KaoriEl/sudoku-golang/releases/latest/download/sudoku_darwin_arm64.tar.gz | tar xz sudoku
+./sudoku setup
 ```
 
-Other targets: `make bin` (binary only, into `build/`), `make cross` (all 6 platforms into `build/dist`), `make test`,
-`make lint`, `make release-snapshot` (goreleaser locally). Releases are built by `.github/workflows/release.yml` on
-`v*` tags.
+If you downloaded the archive with a browser, macOS will refuse to run the unsigned binary. Remove the quarantine
+flag: `xattr -d com.apple.quarantine ./sudoku`.
 
-## Available Commands 💻
+### Linux
 
 ```sh
-sudoku start [targets...]   # start (no targets = everything; infrastructure first, then wait for its healthchecks)
+# x86_64. For ARM (aarch64) replace amd64 with arm64. Check with: uname -m
+curl -fsSL https://github.com/KaoriEl/sudoku-golang/releases/latest/download/sudoku_linux_amd64.tar.gz | tar xz sudoku
+./sudoku setup
+```
+
+Your user needs access to Docker without `sudo` (the `docker` group or rootless Docker).
+
+### Windows
+
+In PowerShell:
+
+```powershell
+# x64. For ARM replace amd64 with arm64.
+Invoke-WebRequest https://github.com/KaoriEl/sudoku-golang/releases/latest/download/sudoku_windows_amd64.zip -OutFile sudoku.zip
+Expand-Archive sudoku.zip -DestinationPath sudoku-install
+.\sudoku-install\sudoku.exe setup
+```
+
+Open a new terminal window afterwards so the updated `PATH` is picked up.
+
+All archives are on the [releases page](https://github.com/KaoriEl/sudoku-golang/releases/latest).
+
+### What setup asks
+
+`setup` asks for:
+
+1. the projects folder (`~` works; a missing folder is created only if you agree);
+2. the container prefix for the infrastructure (`dev` → `dev_traefik`, `dev_redis`);
+3. whether to use the `docker` and `docker compose` it found (it shows the path and version; answer `n` to type your
+   own, which is checked before it is saved);
+4. after a summary of what goes where, whether to continue, and whether to add the binary folder to `PATH`.
+
+Where things go:
+
+| What | macOS, Linux | Windows |
+|---|---|---|
+| the `sudoku` command | `~/.local/bin/sudoku` | `%LOCALAPPDATA%\Programs\sudoku\sudoku.exe` |
+| settings, infrastructure, data, backups | `~/.sudoku` | `%USERPROFILE%\.sudoku` |
+| your projects | stay where they are | stay where they are |
+
+The downloaded archive is no longer needed. From now on use `sudoku` from any folder:
+
+```sh
+sudoku doctor     # check docker, compose, ports, permissions
+sudoku start      # start the infrastructure and projects
+sudoku serve      # open the admin at http://127.0.0.1:7777
+```
+
+`setup` can be run again, for example to change the projects folder. It never overwrites existing configs. For
+scripts there is a non-interactive mode: `sudoku setup --root ~/projects --prefix dev --yes`. The settings folder can
+be moved with the `SUDOKU_HOME` variable.
+
+### Updating
+
+```sh
+sudoku update
+```
+
+It downloads the latest release for your system, verifies its SHA-256 against `checksums.txt` and replaces the
+binary. No new `setup` is needed. The same is available in the admin: Settings → Version → check for updates, then
+update and restart the admin.
+
+### Moving from an old install
+
+Older versions kept `sudoku`, `.env`, `compose.yaml` and `sudoku-config/` inside the projects folder. `setup` finds
+such an install by itself and offers to move it into `~/.sudoku` together with the data (`sudoku-config/*/data`,
+backups). Infrastructure containers are recreated from the new place; project containers and the network are left
+alone. To point at the folder explicitly: `sudoku setup --migrate-from <folder>`. The old layout also keeps working
+if you don't move it.
+
+### Uninstalling
+
+If you enabled autostart of the admin, turn it off in the settings first. Then:
+
+```sh
+sudoku down infra                # stop and remove the infrastructure containers
+rm ~/.local/bin/sudoku
+rm -rf ~/.sudoku                 # configs and infrastructure data (redis, elastic…), permanently
+```
+
+Remove the `# sudoku` `PATH` line from `~/.zshrc` (or `~/.bashrc`) by hand. On Windows delete
+`%LOCALAPPDATA%\Programs\sudoku` and `%USERPROFILE%\.sudoku` and remove the folder from your user `PATH`.
+
+### Building from source
+
+Requires Go and Node.js with npm.
+
+```sh
+git clone https://github.com/KaoriEl/sudoku-golang.git && cd sudoku-golang
+make build        # builds the admin UI and the binary, then runs sudoku setup
+```
+
+A `.env` in the repository root is optional; if present, its values become the template for `~/.sudoku/.env`.
+Other targets: `make bin` (binary only, into `build/`), `make cross` (all platforms into `build/dist`), `make test`,
+`make lint`.
+
+## Commands
+
+```sh
+sudoku start [targets...]   # start; without targets everything, infrastructure first
 sudoku stop | down | restart | build | rebuild | force-build | force-rebuild [targets...]
-sudoku status [targets...]  # status table (--json, -a to include foreign containers)
-sudoku logs <targets...> -f # logs (compose logs), --tail, --since, -t
-sudoku exec <service> [-- command...]  # shell or command in a service (-u user, -T no TTY)
+sudoku status [targets...]  # status table (--json; -a includes foreign containers)
+sudoku logs <targets...> -f # logs (--tail, --since, -t)
+sudoku exec <service> [-- command...]   # shell or command in a container (-u user, -T no TTY)
 sudoku sets list | add <name> <targets...> | rm <name>   # project sets
-sudoku doctor               # diagnostics: docker, compose, socket, projects, ports, permissions (--json)
+sudoku doctor               # diagnostics (--json)
 sudoku serve                # web admin
-sudoku setup                # install / change the projects folder / move an old install
+sudoku setup                # install, change the projects folder, move an old install
 sudoku update [--check]     # update to the latest release
 sudoku version
-sudoku completion bash|zsh|fish|powershell   # completion (projects, services and sets)
+sudoku completion bash|zsh|fish|powershell
 ```
 
-**Targets**: a project name (a folder with `compose-sudoku.yaml`), `infra` (the root `compose.yaml`), a service name
-(found in any project), `project/service` (or `project:service`), patterns (`api-*`, `*/db`). Sets: `--set backend`.
+A target is a project name (folder with `compose-sudoku.yaml`), the word `infra`, a service name from any project, a
+`project/service` pair or a pattern like `api-*`. Sets are passed with `--set`:
 
 ```sh
-sudoku start infra api billing/worker
+sudoku start infra shop billing/worker
 sudoku restart --set backend --no-wait
 sudoku logs infra/traefik -f
 sudoku exec billing/db -- psql -U postgres
 ```
 
-Global flags: `--debug`, `--log`, `-C <dir>` (run from another directory; its `.env` is used if it has `ROOT_PROJECTS_FOLDER`). `start`/`restart`/`rebuild` accept
-`--wait` / `--no-wait` (wait for the infrastructure healthchecks) and `--no-preflight` (skip the port conflict
-check). The exit code is 1 if any compose file failed.
+Global flags: `--debug` prints every command it runs, `--log` enables a detailed log. `start`, `restart` and `rebuild`
+accept `--no-wait` (don't wait for infrastructure healthchecks) and `--no-preflight` (don't check busy ports). If any
+compose file fails, the exit code is 1.
 
-## Web admin 🖥️
+Target completion: `source <(sudoku completion zsh)`, in PowerShell
+`sudoku completion powershell | Out-String | Invoke-Expression`.
 
-`./sudoku serve` starts the admin at `http://127.0.0.1:7777`. The address comes from `ADMIN_ADDR` in `.env` and the
-`--addr` flag overrides it; only loopback addresses are allowed. Enable logs with `--log`.
-The UI is embedded into the binary.
+## Admin
 
-`make build` does not overwrite an existing `~/.sudoku/compose.yaml` or files in `~/.sudoku/sudoku-config/` (they hold
-your edits and ports added from the admin). Regenerate it with `REGENERATE_COMPOSE=1 make build` (the old file is kept as `compose.yaml.bak`).
+`sudoku serve` opens the admin on `http://127.0.0.1:7777`. It is built into the binary and only reachable from this
+computer. It can start automatically at login: Settings → Autostart.
 
-Features:
+**Logs.** Every container has a panel with live logs: text and level filters, highlighted warnings and errors,
+download of the full log. The same panel has a terminal inside the container, resource charts, build commands and the
+service's final `compose config`.
 
-* lists every container of the projects under `ROOT_PROJECTS_FOLDER`, grouped by compose file: status, docker name,
-  IP and DNS names per network, published ports, Traefik hosts (`Host(...)` from labels);
-* stops, starts and restarts a single container;
-* starts, stops and restarts all projects (same as `sudoku start/stop/restart`) with a per-compose-file run log;
-* per-container panel: live **logs** (`docker logs -f`, filter, wrap, download), an in-browser **terminal**
-  (`docker exec -it`, bash or sh) and **build** info: the full `docker build` command derived from
-  `docker compose config` (with build args), ready-made compose commands and a "rebuild service" button;
-* **Monitoring**: live resource usage via the Docker Engine API (every 2 s by default, up to 30 minutes of history): CPU, memory, network
-  and block I/O in total and per container, charts with crosshair tooltips, a sortable table with sparklines, and
-  Docker disk usage (images, volumes, container layers, build cache). Every container also has a "Resources" tab.
-  By default metrics are collected **only while the monitoring page (or a Resources tab) is open**. Settings has a
-  background-collection toggle and the polling interval for both modes: live 1–60 s (default 2 s), background
-  5 s – 1 h (default 10 s). Stored in `~/.sudoku/sudoku-config/admin.yaml`;
-* **Cleanup**: frees disk space by removing unused images, build cache (all of it, or entries older than 1/7/30 days)
-  and stopped containers. It shows a preview first and removes only what you tick. **Volumes are never removed**, not
-  even with containers: `docker rm` runs without `-v`. Stopped containers with Docker volumes and anything that looks
-  like a database (by image, name or data path) are protected and can't be selected. Images are deleted without
-  force, so an image used by any container is refused. The server re-reads Docker state and re-checks every item
-  before deleting;
-* **"Don't start"** flag per service: skipped by "start all" / "restart all" and by the CLI `sudoku start`, `restart`,
-  `rebuild`, `build`. Stored in `~/.sudoku/sudoku-config/disabled.yaml` (hand-editable). If an enabled
-  service `depends_on` a disabled one, compose still starts it, and the admin warns about that;
-* **Ports**: manages Traefik ports in the root `compose.yaml` (adds/removes `ports:` entries with comments and,
-  optionally, entryPoints in `sudoku-config/traefik/traefik.yaml`), shows which containers use each entryPoint and
-  applies changes by recreating Traefik. A `*.sudoku.bak` copy is written before every change;
-* **Multi-select**: tick services (or a whole group/table) and start, stop or restart them in one run
-  (`compose up -d` / `stop` for just those services of each file), or flag them "don't start" / "start again" at once;
-* **Config editor** (Settings): edits the sudoku `.env` (`~/.sudoku/.env`) (`ROOT_PROJECTS_FOLDER`, `DOCKER_PATH`,
-  `DOCKER_COMPOSE_PATH`, `MAX_WORKERS`, `ADMIN_ADDR`). Values are validated, other lines and comments are kept, a
-  `.env.sudoku.bak` copy is written, and `serve` re-executes itself to apply them. Changing the address warns that the
-  current page will stop working and then opens the new address. An enabled autostart unit is refreshed.
-  `make build` does not overwrite an existing `~/.sudoku/.env` (`OVERWRITE_ENV=1` forces it);
-* **Settings**: autostart of `sudoku serve` at login (macOS LaunchAgent, Linux `systemd --user`) and re-enabling
-  confirmations hidden with "don't show again";
-* optionally shows foreign compose containers (outside `ROOT_PROJECTS_FOLDER`), read-only.
-* **Live updates**: the admin follows Docker events and pushes changes to the browser over SSE (`/api/events`) —
-  statuses change within ~250 ms without polling (polling remains a 30 s safety net);
-* **Alerts**: an OS notification (macOS, Linux `notify-send`, Windows toast) and a browser notification when a
-  container crashes (not stopped on purpose), fails its healthcheck or is OOM-killed; listed on "Monitoring";
-* **Startup order**: "Start all" and `sudoku start` bring up the infrastructure, wait for its healthchecks
-  (configurable, up to 3 min by default) and only then start the projects;
-* **Sets**: named groups of targets (`sudoku-config/sets.yaml`), started/stopped with one click, created from the
-  services selected in the table;
-* **Command palette**: `⌘K` / `Ctrl+K` — navigation, logs/terminal/config/restart of any service;
-* **Logs**: level filter (WARN+/ERROR), search with highlighting and `Enter`/`Shift+Enter` navigation, a merged
-  stream of all services of a project, full-log download streamed from the server;
-* **Config**: the effective `compose config` of a service, the uninterpolated version and its `${VAR}` references
-  with unset ones highlighted; secrets are masked until revealed;
-* **Runs**: history of all runs (last 100, `sudoku-config/runs/`) with each step's output, survives restarts;
-* **Image updates**: "Check updates" compares the local image digest with the registry (no pull, auth from
-  `~/.docker/config.json`); an "UPDATE" badge marks the service;
-* **Backups**: one-click dumps of PostgreSQL, MySQL/MariaDB, MongoDB and Redis/KeyDB/Valkey into `${ROOT}/backups/`,
-  download and restore (typed confirmation), keeping the last N per database;
-* **Network → Domains & TLS**: Traefik domains and how they resolve, a managed block in the hosts file (without
-  permission it stages the file and prints `sudo cp …` / the PowerShell command), local HTTPS via mkcert plus the
-  Traefik file-provider config;
-* **Port conflicts**: before starting, checks whether a published port is taken by another container or a host
-  process and offers to stop the conflicting container;
-* **Schedules**: periodic disk cleanup (build cache, dangling images, stopped containers) and update checks;
-* **Diagnostics**: the same checks as `sudoku doctor` on the settings page.
-* **Infrastructure**: an editor for `~/.sudoku/compose.yaml` and `traefik.yaml` in the admin — line numbers,
-  Tab/Shift+Tab, ⌘S/Ctrl+S, 28 grouped service templates (queues: RabbitMQ, NATS, Kafka + Kafka UI, Centrifugo; databases:
-  PostgreSQL, MySQL, MariaDB, MongoDB, ClickHouse, Valkey, Memcached; search: Meilisearch, OpenSearch, Typesense, Qdrant;
-  storage: SeaweedFS S3, LocalStack; observability: Jaeger, Prometheus, Grafana; tools: Mailpit, Adminer, pgAdmin,
-  Mongo Express, Redis Insight, Keycloak, Ollama), appended to `services:` with your prefix, dependencies added
-  automatically, web UIs on `http://<name>.localhost`). Compose is checked with `docker compose config` on a copy next to the file before writing, the
-  previous version goes to `*.sudoku.bak`, and a save is refused if the file changed meanwhile (by hand or by the ports
-  page). "Save and apply": compose → `up -d` of the enabled infra services, traefik → recreate the traefik container.
+<p align="center"><img src="img/screenshots/logs.webp" alt="Container logs" width="900"/></p>
 
-Security: the server listens only on loopback (`localhost`, `127.0.0.1`, `::1`) or a unix socket
-(`ADMIN_ADDR=unix:/path/sudoku.sock`, mode 0600), rejects cross-site requests (`Sec-Fetch-Site`, `Origin`, JSON-only
-POSTs) and cannot be framed (CSP `frame-ancestors 'none'`). On shared machines set `ADMIN_TOKEN`: the panel then opens
-only via the `http://127.0.0.1:7777/?token=…` link printed by `sudoku serve` (an HttpOnly cookie afterwards), and API
-clients send `Authorization: Bearer <token>`. Never expose the admin publicly: it controls Docker on your machine.
+**Monitoring.** CPU, memory, network and disk, in total and per container, for the last 30 minutes. Below the charts
+there is a sortable container table and how much space images, volumes and build cache take.
 
-UI development:
+<p align="center"><img src="img/screenshots/monitoring.webp" alt="Monitoring" width="900"/></p>
+
+**Infrastructure.** An editor for `compose.yaml` and `traefik.yaml`. Services can be added from templates: RabbitMQ,
+NATS, Kafka, PostgreSQL, MySQL, MongoDB, ClickHouse, Meilisearch, OpenSearch, Grafana, Jaeger, Keycloak and about
+fifteen more. Before saving, the file is checked with `docker compose config`, and the previous version is kept in
+`*.sudoku.bak`. "Save and apply" brings the change up right away.
+
+<p align="center"><img src="img/screenshots/infra.webp" alt="Infrastructure editor" width="900"/></p>
+
+**Command palette.** `⌘K` or `Ctrl+K`: type a service name and pick an action (logs, restart, terminal, config). It
+also jumps to any page.
+
+<p align="center"><img src="img/screenshots/palette.webp" alt="Command palette" width="900"/></p>
+
+Also in the admin:
+
+* start, stop and restart everything, one project, one service or the containers ticked in the list;
+* a "don't start" flag on a service, respected by both the admin and the CLI;
+* sets: named groups of projects started with one button;
+* run history with the output of every step;
+* notifications when a container crashes, fails its healthcheck or runs out of memory;
+* a busy-port check before starting;
+* backups and restore for PostgreSQL, MySQL/MariaDB, MongoDB and Redis/KeyDB/Valkey;
+* Traefik ports: add, remove, apply;
+* domains: hosts-file entries and a local HTTPS certificate via mkcert;
+* image update checks without pulling;
+* disk cleanup of unused images and build cache; volumes are never removed;
+* `.env` editor, sudoku self-update and admin restart in the settings.
+
+## Configuration
+
+Settings live in `~/.sudoku/.env`. Change them in the admin (Settings → sudoku config) or by hand.
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `ROOT_PROJECTS_FOLDER` | projects folder | set by `setup` |
+| `PREFIX_CONTAINER_NAME` | infrastructure container prefix | `dev` |
+| `DOCKER_PATH` | docker command | found by `setup` |
+| `DOCKER_COMPOSE_PATH` | compose command | found by `setup` |
+| `MAX_WORKERS` | how many compose files are stopped in parallel (1–64) | `5` |
+| `ADMIN_ADDR` | admin address: `127.0.0.1:port` or `unix:/path.sock` | `127.0.0.1:7777` |
+| `ADMIN_TOKEN` | admin login token | not set |
+
+A value can also come from an environment variable or the file `/vault/secrets/CRED_<NAME>`. The Docker Engine is
+located the same way the docker CLI does it: `DOCKER_HOST`, then the current `docker context`, then the default
+socket.
+
+Admin settings (start order, notifications, schedules, backups, metrics) are stored in
+`~/.sudoku/sudoku-config/admin.yaml`, sets in `sets.yaml`, disabled services in `disabled.yaml`. These files can be
+edited by hand.
+
+## Infrastructure
+
+By default `~/.sudoku/compose.yaml` contains:
+
+| Service | Image | Purpose |
+|---|---|---|
+| traefik | `traefik:2.11.31` | serves projects on `*.localhost` domains, proxies TCP; dashboard on `127.0.0.1:8080` |
+| redis | `eqalpha/keydb` | cache, data in `sudoku-config/redis/data` |
+| elasticsearch | `elasticsearch:9.1.8` | search, data in `sudoku-config/elasticsearch/data` |
+
+Traefik's config is `sudoku-config/traefik/traefik.yaml`; extra rules go into `sudoku-config/traefik/custom/`.
+Anything else is added in the admin's infrastructure editor or directly in `compose.yaml`. To let a project reach the
+infrastructure, attach it to the external network:
+
+```yaml
+networks:
+  sudoku_network:
+    name: sudoku_network
+    external: true
+```
+
+## Security
+
+The admin listens only on `127.0.0.1`, `::1` or a unix socket and rejects requests from other sites. On shared
+machines set `ADMIN_TOKEN`: login is then possible only through the tokenised link printed by `sudoku serve`. Don't
+expose the admin to the network: it controls Docker on your computer.
+
+## Development
 
 ```sh
-make bin         # build only the binary (UI + go build) into build/sudoku, no deploy
+make test        # go test -race ./...
+make lint        # golangci-lint
 make serve       # build the UI and run the API on :7777
-make web-dev     # Vite dev server on :5173 proxying /api to :7777
+make web-dev     # Vite on :5173, /api is proxied to :7777
 ```
 
-The UI design system lives in `.agents/design/`.
-
-## Configuration 🔧
-
-Configuration comes from `.env` in the sudoku directory — `$SUDOKU_HOME`, else the current directory when its `.env`
-has `ROOT_PROJECTS_FOLDER` (old layout, repository checkout), else `~/.sudoku` —, environment variables or
-`/vault/secrets/CRED_<NAME>`. The same directory holds the infrastructure `compose.yaml` and `sudoku-config/` (in the
-old layout they sit in `ROOT_PROJECTS_FOLDER` until `sudoku setup` moves them).
-
-* `ROOT_PROJECTS_FOLDER` — the projects folder (required; `~` and relative paths resolve against the sudoku directory)
-* `DOCKER_PATH` — docker command (default `docker` from PATH; paths with spaces are fine)
-* `DOCKER_COMPOSE_PATH` — compose command (default `docker-compose` if installed, else `docker compose`)
-* `MAX_WORKERS` — stop/down parallelism (1–64, default 5)
-* `ADMIN_ADDR` — admin address: loopback `host:port` (default `127.0.0.1:7777`) or `unix:/path.sock`
-* `ADMIN_TOKEN` — admin access token (optional)
-* `PREFIX_CONTAINER_NAME` — infrastructure container-name prefix (for `sudoku setup`)
-
-The Docker Engine is located like the docker CLI does: `DOCKER_HOST` (unix, `npipe://` on Windows, `tcp://` with
-`DOCKER_TLS_VERIFY`/`DOCKER_CERT_PATH`), then the current `docker context`, then the default socket / named pipe.
-
-Admin and CLI settings (startup order, notifications, schedules, backups, metrics) live in
-`~/.sudoku/sudoku-config/admin.yaml`, sets in `sets.yaml`, disabled services in `disabled.yaml`.
-
-Autostart of `sudoku serve` at login: macOS LaunchAgent, Linux `systemd --user`, Windows a hidden launcher in the
-Startup folder.
-
-## Infrastructure 🏗️
-
-The project uses Docker Compose to run the local infrastructure required for the Sudoku CLI service. All services are connected via a dedicated network `sudoku_network`.
-
-### Services 🛠️
-
-#### Traefik 🌐
-
-* Version: `2.11.31`
-* Reverse proxy for routing traffic to other services.
-* Exposed ports:
-
-    * `8080` — Traefik web dashboard (accessible locally at `127.0.0.1:8080`)
-    * `80`, `443`, `5173`, `16379`, `8000`, `25`, `110`, `143`, `465`, `587`, `993`, `995`, `8443`, `8081`, `13306`, `13307`
-* Connects to the Docker socket for automatic container discovery.
-* Configuration files:
-
-    * `sudoku-config/traefik/traefik.yaml`
-    * `sudoku-config/traefik/custom/`
-
-#### Redis (KeyDB) 🟢
-
-* Image: `eqalpha/keydb:latest`
-* Primary service for caching and data storage.
-* Port `6379` exposed via Traefik TCP router.
-* Data stored in `sudoku-config/redis/data`.
-* User and group are taken from `DOCKER_UID` and `DOCKER_GID` environment variables.
-
-#### Elasticsearch 🔍
-
-* Image: `elasticsearch:9.1.8`
-* Used for storing and searching large volumes of data.
-* Configuration:
-
-    * `ES_JAVA_OPTS=-Xms512m -Xmx512m`
-    * `discovery.type=single-node`
-* Data stored in `sudoku-config/elasticsearch/data`.
-* Port `9200` exposed via Traefik TCP router.
-
-#### RabbitMQ 🐇
-
-* Image: `rabbitmq:4.2.1-management-alpine`
-* Message broker for inter-service communication.
-* Exposed ports:
-
-    * `5672` — main client port
-    * `15672` — RabbitMQ management web interface
-* Default credentials:
-
-    * User: `default`
-    * Password: `default`
-
-### Network 🌐
-
-All services are connected to the `sudoku_network` using the `bridge` driver. **IPv6** is disabled.
-
-## Project Structure 📂
-
-```
-cmd/                  ── CLI entry point (main.go)
-internal/
-├── infra/
-│   └── configs/      ── loading and processing configs (configs.go)
-├── logger/
-│   └── logger.go     ── logging
-├── service/
-│   └── compose.go    ── working with Docker Compose and progress bars
-└── sudoku/
-    ├── commands/     ── CLI commands (build, start, stop, rebuild, etc.)
-    └── cli.go        ── CLI initialization and startup
-```
+CLI code lives in `internal/`, the admin UI in `web/` (React + TypeScript), the UI design rules in `.agents/design/`.
+Releases are built by GitHub Actions on every push to `master`; the next version number is set automatically.

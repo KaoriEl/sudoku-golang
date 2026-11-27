@@ -26,7 +26,7 @@ builds:
 
 archives:
   - id: sudoku
-    name_template: "sudoku_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "sudoku_{{ .Os }}_{{ .Arch }}"
     formats: [tar.gz]
     format_overrides:
       - goos: windows

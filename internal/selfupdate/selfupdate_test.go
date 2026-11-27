@@ -89,3 +89,25 @@ func TestApply(t *testing.T) {
 		t.Fatalf("missing checksums accepted: %v", err)
 	}
 }
+
+func TestAssetForNames(t *testing.T) {
+	r := Release{Assets: []Asset{
+		{Name: "checksums.txt"},
+		{Name: "sudoku_linux_arm64.tar.gz"},
+		{Name: "sudoku_windows_amd64.zip"},
+		{Name: "sudoku_1.0.3_darwin_arm64.tar.gz"},
+	}}
+	cases := [][3]string{
+		{"linux", "arm64", "sudoku_linux_arm64.tar.gz"},
+		{"windows", "amd64", "sudoku_windows_amd64.zip"},
+		{"darwin", "arm64", "sudoku_1.0.3_darwin_arm64.tar.gz"},
+	}
+	for _, c := range cases {
+		if a, ok := r.AssetFor(c[0], c[1]); !ok || a.Name != c[2] {
+			t.Fatalf("%s/%s: %q %v", c[0], c[1], a.Name, ok)
+		}
+	}
+	if _, ok := r.AssetFor("linux", "amd64"); ok {
+		t.Fatal("linux/amd64 must not match linux_arm64")
+	}
+}
