@@ -32,8 +32,7 @@ type DomainsView struct {
 
 // traefikCustomDir is the host folder mounted at /etc/traefik/custom (Traefik's file provider).
 func (s *Service) traefikCustomDir() string {
-	root, _ := filepath.Abs(s.cfg.RootProjectsFolder)
-	dir := filepath.Join(root, "sudoku-config", "traefik", "custom")
+	dir := filepath.Join(s.layout.ConfigDir(), "traefik", "custom")
 	inf, err := s.infra()
 	if err != nil {
 		return dir
@@ -48,8 +47,7 @@ func (s *Service) traefikCustomDir() string {
 }
 
 func (s *Service) stagedHosts() string {
-	root, _ := filepath.Abs(s.cfg.RootProjectsFolder)
-	return filepath.Join(root, "sudoku-config", "hosts.sudoku")
+	return filepath.Join(s.layout.ConfigDir(), "hosts.sudoku")
 }
 
 // hostNames maps every Traefik Host() of a managed container to the containers that serve it.

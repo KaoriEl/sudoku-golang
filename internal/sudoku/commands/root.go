@@ -53,20 +53,23 @@ func (a *app) load() error {
 // checkRoot stops commands early when there is no projects folder yet (typically a freshly
 // downloaded binary run before `sudoku setup`), instead of silently doing nothing.
 func checkRoot(root string) error {
-	if st, err := os.Stat(root); err == nil && st.IsDir() {
-		return nil
+	if root != "" {
+		if st, err := os.Stat(root); err == nil && st.IsDir() {
+			return nil
+		}
 	}
 	exe := "./sudoku"
 	if runtime.GOOS == "windows" {
 		exe = `.\sudoku.exe`
 	}
-	src := "ROOT_PROJECTS_FOLDER из .env"
-	if configs.Source("ROOT_PROJECTS_FOLDER") == "default" {
-		src = "в текущей папке нет .env, ROOT_PROJECTS_FOLDER по умолчанию"
+	env := configs.EnvPath()
+	if _, err := os.Stat(env); err != nil {
+		return fmt.Errorf("sudoku ещё не установлен (нет %s).\nЗапустите: %s setup", env, exe)
 	}
-	return fmt.Errorf("папка проектов %q не найдена (%s).\n"+
-		"Первый запуск: %s setup --root <папка с проектами> --prefix dev\n"+
-		"Затем запускайте sudoku из этой папки или с -C <папка>", root, src, exe)
+	if root == "" {
+		return fmt.Errorf("в %s не задан ROOT_PROJECTS_FOLDER.\nЗапустите: sudoku setup", env)
+	}
+	return fmt.Errorf("папка с проектами %s не найдена (ROOT_PROJECTS_FOLDER в %s).\nПоменяйте её: sudoku setup", root, env)
 }
 
 func noConfig(cmd *cobra.Command) *cobra.Command {
@@ -118,7 +121,7 @@ func Root() *cobra.Command {
 	pf := root.PersistentFlags()
 	pf.BoolVar(&a.debug, "debug", false, "Печатать каждую выполняемую команду вместо прогресс-бара")
 	pf.BoolVar(&a.logEnabled, "log", false, "Подробный JSON-лог (иначе только ошибки)")
-	pf.StringVarP(&a.chdir, "chdir", "C", "", "Перейти в эту папку перед чтением .env")
+	pf.StringVarP(&a.chdir, "chdir", "C", "", "Перейти в эту папку перед запуском (её .env используется, если это .env sudoku)")
 
 	root.AddGroup(
 		&cobra.Group{ID: groupActions, Title: "Действия:"},

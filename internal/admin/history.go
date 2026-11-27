@@ -47,7 +47,7 @@ func summarize(r *Run) RunSummary {
 	return sum
 }
 
-// runHistory keeps finished runs in ${ROOT}/sudoku-config/runs/<id>.json (the last 100), so "what
+// runHistory keeps finished runs in sudoku-config/runs/<id>.json (the last 100), so "what
 // failed yesterday" survives a restart of the admin. Step output is already capped at 16 KB.
 type runHistory struct {
 	log    *slog.Logger
@@ -57,8 +57,8 @@ type runHistory struct {
 	loaded bool
 }
 
-func newRunHistory(log *slog.Logger, root string) *runHistory {
-	return &runHistory{log: log, dir: filepath.Join(root, "sudoku-config", "runs")}
+func newRunHistory(log *slog.Logger, configDir string) *runHistory {
+	return &runHistory{log: log, dir: filepath.Join(configDir, "runs")}
 }
 
 func (h *runHistory) path(id string) string {

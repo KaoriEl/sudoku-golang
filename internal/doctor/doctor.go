@@ -96,10 +96,10 @@ func short(err error) string {
 // Run executes every check. Independent checks run concurrently; the report keeps a stable order.
 func Run(ctx context.Context, env Env) Report {
 	c := &collector{}
-	root := env.Cfg.RootProjectsFolder
+	l := service.LayoutOf(env.Cfg)
 
-	c.add(checkEnvFile())
-	files := checkRoot(c, root)
+	c.add(checkEnvFile(env.Cfg))
+	files := checkRoot(c, env.Cfg, l)
 	var wg sync.WaitGroup
 	wg.Add(3)
 	go func() { defer wg.Done(); checkDocker(ctx, c, env) }()
@@ -108,8 +108,8 @@ func Run(ctx context.Context, env Env) Report {
 	wg.Wait()
 	checkFiles(ctx, c, env, files)
 	checkPorts(ctx, c, env, files)
-	checkWritable(c, root)
-	checkStores(c, root)
+	checkWritable(c, l)
+	checkStores(c, l)
 	checkTools(c)
 
 	order := map[string]int{
@@ -137,40 +137,67 @@ func sortChecks(list []Check, order map[string]int) {
 	}
 }
 
-func checkEnvFile() Check {
+func checkEnvFile(cfg *configs.Config) Check {
 	ch := Check{Group: groupConfig, Title: ".env"}
-	wd, _ := os.Getwd()
-	p := filepath.Join(wd, configs.EnvFileName)
+	p := filepath.Join(cfg.Home, configs.EnvFileName)
 	if _, err := os.Stat(p); err != nil {
 		ch.Level, ch.Detail = Warn, "нет "+p+" — используются переменные окружения и значения по умолчанию"
-		ch.Hint = "sudoku setup создаст .env, или запускайте sudoku из папки с .env (-C <папка>)"
+		ch.Hint = "sudoku setup создаст его"
 		return ch
 	}
 	ch.Level, ch.Detail = OK, p
 	return ch
 }
 
-func checkRoot(c *collector, root string) []string {
+func checkRoot(c *collector, cfg *configs.Config, l service.Layout) []string {
+	infra := Check{Group: groupConfig, Title: "инфраструктура"}
+	switch {
+	case !fileExists(l.InfraFile()):
+		infra.Level, infra.Detail, infra.Hint = Warn, "нет "+l.InfraFile(), "sudoku setup создаст его"
+	case cfg.Legacy():
+		infra.Level, infra.Detail = Warn, l.InfraFile()+" — старая раскладка: инфраструктура внутри папки проектов"
+		infra.Hint = "sudoku setup перенесёт её в " + configs.DefaultHome()
+	default:
+		infra.Level, infra.Detail = OK, l.InfraFile()
+	}
+	c.add(infra)
+
 	ch := Check{Group: groupConfig, Title: "ROOT_PROJECTS_FOLDER"}
-	st, err := os.Stat(root)
-	if err != nil || !st.IsDir() {
-		ch.Level, ch.Detail, ch.Hint = Fail, "папка "+root+" не найдена", "укажите ROOT_PROJECTS_FOLDER в .env"
+	root := l.Root
+	if root == "" {
+		ch.Level, ch.Detail, ch.Hint = Fail, "не задан", "sudoku setup или ROOT_PROJECTS_FOLDER в "+configs.EnvPath()
 		c.add(ch)
 		return nil
 	}
-	abs, _ := filepath.Abs(root)
-	files, err := service.DiscoverComposeFiles(root)
+	st, err := os.Stat(root)
+	if err != nil || !st.IsDir() {
+		ch.Level, ch.Detail, ch.Hint = Fail, "папка "+root+" не найдена", "укажите ROOT_PROJECTS_FOLDER в "+configs.EnvPath()
+		c.add(ch)
+		return nil
+	}
+	files, err := l.Discover()
+	projects := 0
+	for _, f := range files {
+		if !l.IsInfra(f) {
+			projects++
+		}
+	}
 	switch {
 	case err != nil:
 		ch.Level, ch.Detail = Fail, short(err)
-	case len(files) == 0:
-		ch.Level, ch.Detail = Warn, abs+": compose-файлы не найдены"
-		ch.Hint = "нужен compose.yaml в корне и/или <проект>/compose-sudoku.yaml"
+	case projects == 0:
+		ch.Level, ch.Detail = Warn, root+": проекты не найдены"
+		ch.Hint = "sudoku ищет <проект>/compose-sudoku.yaml в этой папке"
 	default:
-		ch.Level, ch.Detail = OK, fmt.Sprintf("%s: %d compose-файлов", abs, len(files))
+		ch.Level, ch.Detail = OK, fmt.Sprintf("%s: %d проектов", root, projects)
 	}
 	c.add(ch)
 	return files
+}
+
+func fileExists(p string) bool {
+	_, err := os.Stat(p)
+	return err == nil
 }
 
 func run(ctx context.Context, env Env, base []string, args ...string) (string, error) {
@@ -266,15 +293,14 @@ func checkFiles(ctx context.Context, c *collector, env Env, files []string) {
 	workers := max(1, env.Cfg.MaxWorkers)
 	sem := make(chan struct{}, workers)
 	var wg sync.WaitGroup
-	root, _ := filepath.Abs(env.Cfg.RootProjectsFolder)
+	l := service.LayoutOf(env.Cfg)
 	for _, f := range files {
 		wg.Add(1)
 		sem <- struct{}{}
 		go func(f string) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			rel, _ := filepath.Rel(root, f)
-			ch := Check{Group: groupProjects, Title: filepath.ToSlash(rel)}
+			ch := Check{Group: groupProjects, Title: l.Rel(f)}
 			out, err := run(ctx, env, env.Runner.ComposeArgv(), "--file", f, "config", "--quiet")
 			switch {
 			case err != nil:
@@ -325,8 +351,8 @@ func checkPorts(ctx context.Context, c *collector, env Env, files []string) {
 	}
 }
 
-func checkWritable(c *collector, root string) {
-	dir := filepath.Join(root, "sudoku-config")
+func checkWritable(c *collector, l service.Layout) {
+	dir := l.ConfigDir()
 	ch := Check{Group: groupFiles, Title: "sudoku-config"}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		ch.Level, ch.Detail = Fail, short(err)
@@ -345,14 +371,14 @@ func checkWritable(c *collector, root string) {
 	c.add(ch)
 }
 
-func checkStores(c *collector, root string) {
-	if _, err := prefs.Load(prefs.Path(root)); err != nil {
+func checkStores(c *collector, l service.Layout) {
+	if _, err := prefs.Load(prefs.Path(l.Data)); err != nil {
 		c.add(Check{Group: groupFiles, Title: "admin.yaml", Level: Fail, Detail: short(err)})
 	}
-	if _, err := service.NewDisabledStore(root).For(""); err != nil {
+	if _, err := service.NewDisabledStore(l).For(""); err != nil {
 		c.add(Check{Group: groupFiles, Title: "disabled.yaml", Level: Fail, Detail: short(err)})
 	}
-	if _, err := service.NewSetsStore(root).List(); err != nil {
+	if _, err := service.NewSetsStore(l).List(); err != nil {
 		c.add(Check{Group: groupFiles, Title: "sets.yaml", Level: Fail, Detail: short(err)})
 	}
 }

@@ -1,9 +1,11 @@
 package configs
 
 import (
+	"errors"
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -11,11 +13,15 @@ import (
 )
 
 type Config struct {
-	DockerPath         string
-	DockerComposePath  string
-	MaxWorkers         int
+	DockerPath        string
+	DockerComposePath string
+	MaxWorkers        int
+	// RootProjectsFolder is absolute: ~ expanded, relative values resolved against Home.
 	RootProjectsFolder string
-	AdminAddr          string
+	// Home holds .env; DataDir holds the infra compose.yaml, sudoku-config/ and backups (see DataDirFor).
+	Home      string
+	DataDir   string
+	AdminAddr string
 	// AdminToken, when set, is required by the admin (cookie after ?token=…, or Authorization: Bearer).
 	AdminToken string
 }
@@ -23,7 +29,7 @@ type Config struct {
 // DefaultAdminAddr is where `sudoku serve` listens when neither --addr nor ADMIN_ADDR is set.
 const DefaultAdminAddr = "127.0.0.1:7777"
 
-// EnvFileName is the dotenv file read from the working directory.
+// EnvFileName is the dotenv file read from the sudoku home (see ResolveHome).
 const EnvFileName = ".env"
 
 // dotenvKeys are the variables that were set by the .env file (not by the real environment).
@@ -38,7 +44,8 @@ func MustLoad() (*Config, error) {
 			before[k] = true
 		}
 	}
-	if err := godotenv.Load(EnvFileName); err != nil {
+	home = ResolveHome()
+	if err := godotenv.Load(filepath.Join(home, EnvFileName)); err != nil && !errors.Is(err, os.ErrNotExist) {
 		slog.Warn("Failed to load .env file", slog.Any("error", err))
 	}
 	for _, kv := range os.Environ() {
@@ -51,10 +58,13 @@ func MustLoad() (*Config, error) {
 		DockerPath:         readValueFromFileOrEnv("DOCKER_PATH", DefaultDockerPath),
 		DockerComposePath:  readValueFromFileOrEnv("DOCKER_COMPOSE_PATH", DefaultDockerComposePath()),
 		MaxWorkers:         clampWorkers(readValueAsInt("MAX_WORKERS", defaultWorkers)),
-		RootProjectsFolder: readValueFromFileOrEnv("ROOT_PROJECTS_FOLDER", "projects"),
+		RootProjectsFolder: ExpandPath(readOptional("ROOT_PROJECTS_FOLDER", ""), home),
+		Home:               home,
 		AdminAddr:          readOptional("ADMIN_ADDR", DefaultAdminAddr),
 		AdminToken:         readOptional("ADMIN_TOKEN", ""),
 	}
+
+	cfg.DataDir = DataDirFor(home, cfg.RootProjectsFolder)
 
 	return cfg, nil
 }
@@ -79,7 +89,7 @@ func readValueFromFileOrEnv(valueName string, defaultValue string) string {
 	if v := os.Getenv(valueName); v != "" {
 		return v
 	}
-	slog.Warn("Config value not found, using default", slog.String("key", valueName), slog.String("default", defaultValue))
+	slog.Debug("Config value not found, using default", slog.String("key", valueName), slog.String("default", defaultValue))
 	return defaultValue
 }
 

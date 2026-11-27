@@ -8,6 +8,7 @@ import (
 	"slices"
 	"sudoku-golang/internal/autostart"
 	"sudoku-golang/internal/cleanup"
+	"sudoku-golang/internal/infra/configs"
 	"sudoku-golang/internal/metrics"
 	"sudoku-golang/internal/notify"
 	"sudoku-golang/internal/prefs"
@@ -127,11 +128,11 @@ func (s *Service) autostartSpec() (autostart.Spec, string) {
 	return s.autostartSpecWith(s.addrFromFlag)
 }
 
-// autostartSpecWith builds the autostart command. Settings come from .env in the working directory;
+// autostartSpecWith builds the autostart command. Settings come from .env in SUDOKU_HOME;
 // --addr is passed only when the running server got it as a flag, and ROOT_PROJECTS_FOLDER only
 // when there is no .env to read it from.
 func (s *Service) autostartSpecWith(keepAddrFlag bool) (autostart.Spec, string) {
-	extra := map[string]string{}
+	extra := map[string]string{configs.HomeEnv: s.cfg.Home}
 	if _, err := os.Stat(envPath()); err != nil {
 		root, _ := filepath.Abs(s.cfg.RootProjectsFolder)
 		extra[keyRoot] = root
@@ -184,7 +185,7 @@ func (s *Service) Settings() Settings {
 			NextUpdates: next(p.Schedule.Updates.LastRun, p.Schedule.Updates.EveryHours, p.Schedule.Updates.Enabled),
 			CacheModes:  cleanup.CacheAges,
 		},
-		Backups:  BackupSettings{Keep: p.Backups.Keep, Dir: p.BackupDir(root)},
+		Backups:  BackupSettings{Keep: p.Backups.Keep, Dir: p.BackupDir(s.layout.Data)},
 		Version:  version.Get(),
 		Auth:     AuthSettings{Token: s.authToken != "", Socket: s.unixSocket},
 		Endpoint: s.engine.Socket(),

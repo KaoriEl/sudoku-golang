@@ -78,17 +78,13 @@ func (s *Service) SetRestarter(r Restarter, addrFromFlag bool) {
 }
 
 func envPath() string {
-	p, err := filepath.Abs(configs.EnvFileName)
-	if err != nil {
-		return configs.EnvFileName
-	}
-	return p
+	return configs.EnvPath()
 }
 
 func (s *Service) effective(key string) (string, string) {
 	switch key {
 	case keyRoot:
-		return s.cfg.RootProjectsFolder, "projects"
+		return s.cfg.RootProjectsFolder, ""
 	case keyDocker:
 		return s.cfg.DockerPath, configs.DefaultDockerPath
 	case keyCompose:
@@ -156,9 +152,14 @@ func (s *Service) validateConfig(key, v string) error {
 	}
 	switch key {
 	case keyRoot:
-		st, err := os.Stat(v)
+		p := configs.ExpandPath(v, s.cfg.Home)
+		st, err := os.Stat(p)
 		if err != nil || !st.IsDir() {
-			return invalid("%s: папка %q не найдена", key, v)
+			return invalid("%s: папка %q не найдена", key, p)
+		}
+		if s.cfg.Legacy() && p != s.cfg.RootProjectsFolder {
+			return invalid("%s: инфраструктура (compose.yaml, sudoku-config) лежит в старой папке проектов %s — "+
+				"сначала перенесите её командой `sudoku setup`, иначе после смены папки она пропадёт", key, s.cfg.RootProjectsFolder)
 		}
 	case keyDocker, keyCompose:
 		return checkCommand(key, v)

@@ -9,9 +9,7 @@ import (
 	"sudoku-golang/internal/docker"
 	"sudoku-golang/internal/doctor"
 	"sudoku-golang/internal/engine"
-	"sudoku-golang/internal/infra/configs"
 	"sudoku-golang/internal/selfupdate"
-	"sudoku-golang/internal/setup"
 	"sudoku-golang/internal/version"
 	"time"
 
@@ -72,48 +70,6 @@ func commandDoctor(a *app) *cobra.Command {
 	}
 	cmd.Flags().BoolVar(&asJSON, "json", false, "Вывести в JSON")
 	return cmd
-}
-
-func commandSetup() *cobra.Command {
-	var o setup.Options
-	cmd := &cobra.Command{
-		Use:   "setup",
-		Short: "Развернуть sudoku в ROOT_PROJECTS_FOLDER (бинарник, .env, sudoku-config, compose.yaml)",
-		Long: "Кроссплатформенная замена деплой-части build.sh: копирует этот бинарник и .env в корень проектов,\n" +
-			"раскладывает sudoku-config (из репозитория или встроенный) и генерирует compose.yaml с префиксом\n" +
-			"PREFIX_CONTAINER_NAME. Существующие файлы не трогает без --overwrite-env / --regenerate-compose.",
-		Example: "  sudoku setup --root ~/projects --prefix dev\n  sudoku setup --regenerate-compose",
-		Args:    cobra.NoArgs,
-		RunE: func(_ *cobra.Command, _ []string) error {
-			banner("setup")
-			if o.Root == "" {
-				if cfg, err := configs.MustLoad(); err == nil && os.Getenv("ROOT_PROJECTS_FOLDER") != "" {
-					o.Root = cfg.RootProjectsFolder
-				}
-			}
-			steps, err := setup.Run(o)
-			for _, s := range steps {
-				if s.Done {
-					clime.SuccessLine(s.Action + ": " + s.Path)
-				} else {
-					clime.InfoLine(s.Action + ": " + s.Path)
-				}
-			}
-			if err != nil {
-				return err //nolint:wrapcheck // descriptive
-			}
-			root, _ := filepath.Abs(o.Root)
-			clime.SuccessLine("Готово. Дальше: cd " + root + " && ./sudoku doctor && ./sudoku start")
-			return nil
-		},
-	}
-	f := cmd.Flags()
-	f.StringVar(&o.Root, "root", "", "Папка проектов (по умолчанию ROOT_PROJECTS_FOLDER из .env)")
-	f.StringVar(&o.Prefix, "prefix", "", "Префикс имён контейнеров (по умолчанию PREFIX_CONTAINER_NAME)")
-	f.BoolVar(&o.OverwriteEnv, "overwrite-env", false, "Перезаписать .env в корне (старый → .env.bak)")
-	f.BoolVar(&o.RegenerateCompose, "regenerate-compose", false, "Перегенерировать compose.yaml (старый → compose.yaml.bak)")
-	f.BoolVar(&o.SkipBinary, "no-binary", false, "Не копировать бинарник")
-	return noConfig(cmd)
 }
 
 func commandUpdate(_ *app) *cobra.Command {

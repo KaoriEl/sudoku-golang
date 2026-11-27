@@ -13,7 +13,7 @@ import (
 )
 
 const disabledHeader = `# Сервисы, которые sudoku пропускает при start / restart / rebuild / build.
-# Ключ — путь к compose-файлу относительно ROOT_PROJECTS_FOLDER, значение — список сервисов.
+# Ключ — путь к compose-файлу относительно ROOT_PROJECTS_FOLDER (compose.yaml — инфраструктура), значение — список сервисов.
 # Файл можно править руками или из админки (sudoku serve).
 `
 
@@ -23,22 +23,18 @@ type disabledFile struct {
 
 type DisabledStore struct {
 	mu    sync.Mutex
-	root  string
+	l     Layout
 	path  string
 	data  map[string][]string
 	mtime int64
 }
 
-func DisabledPath(root string) string {
-	return filepath.Join(root, "sudoku-config", "disabled.yaml")
+func DisabledPath(l Layout) string {
+	return filepath.Join(l.ConfigDir(), "disabled.yaml")
 }
 
-func NewDisabledStore(root string) *DisabledStore {
-	abs, err := filepath.Abs(root)
-	if err != nil {
-		abs = root
-	}
-	return &DisabledStore{root: abs, path: DisabledPath(abs), data: map[string][]string{}}
+func NewDisabledStore(l Layout) *DisabledStore {
+	return &DisabledStore{l: l, path: DisabledPath(l), data: map[string][]string{}}
 }
 
 func (d *DisabledStore) Path() string {
@@ -46,11 +42,7 @@ func (d *DisabledStore) Path() string {
 }
 
 func (d *DisabledStore) Rel(composeFile string) string {
-	rel, err := filepath.Rel(d.root, composeFile)
-	if err != nil {
-		return composeFile
-	}
-	return filepath.ToSlash(rel)
+	return d.l.Rel(composeFile)
 }
 
 func (d *DisabledStore) reloadLocked() error {

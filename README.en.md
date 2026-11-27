@@ -37,23 +37,40 @@ sudoku runs on **Linux, macOS and Windows** (amd64 and arm64): a single dependen
 panel embedded. All it needs is Docker (Docker Desktop, Colima, OrbStack, Rancher Desktop or dockerd) with compose
 (`docker compose` or `docker-compose`).
 
-**Release binary** (recommended): download the archive for your platform from the releases page, unpack it and run
+**Release binary** (recommended): download the archive for your platform from the releases page
+(`darwin_arm64` — Apple Silicon Mac, `darwin_amd64` — Intel Mac, `linux_*`, `windows_*`), unpack it and run
 
 ```sh
-./sudoku setup --root ~/projects --prefix dev   # Windows: .\sudoku.exe setup --root C:\projects --prefix dev
-cd ~/projects && ./sudoku doctor && ./sudoku start
+xattr -d com.apple.quarantine ./sudoku   # macOS only: the binary is not signed
+./sudoku setup                           # Windows: .\sudoku.exe setup
 ```
 
-`setup` copies the binary into `ROOT_PROJECTS_FOLDER`, creates `.env` (if missing), lays out `sudoku-config/`
-(embedded in the binary) and generates the root `compose.yaml` with the container-name prefix. Existing files are
-left alone unless `--overwrite-env` / `--regenerate-compose` is given (old ones go to `.bak`). Later updates:
-`./sudoku update` (verifies the SHA-256 from the release's `checksums.txt`).
+`setup` asks for your projects folder and the container prefix, shows what goes where, and installs:
+
+| What | Where |
+|---|---|
+| the `sudoku` command | `~/.local/bin` (Windows: `%LOCALAPPDATA%\Programs\sudoku`), offers to add it to PATH |
+| `.env`, the infrastructure `compose.yaml`, `sudoku-config/`, backups | `~/.sudoku` (or `$SUDOKU_HOME`) |
+| your projects | stay where they are: `<projects folder>/<project>/compose-sudoku.yaml` |
+
+Afterwards the downloaded archive can be deleted and `sudoku` works from any directory: `sudoku doctor`,
+`sudoku start`, `sudoku serve`. The projects folder can be changed at any time (`sudoku setup` or the admin settings);
+the infrastructure does not depend on it. Re-running `setup` is safe: existing files are kept (unless
+`--overwrite-env` / `--regenerate-compose`; old ones go to `.bak`). Unattended: `sudoku setup --root ~/projects
+--prefix dev --yes`. Updates: `sudoku update` (verifies the SHA-256 from the release's `checksums.txt`), no new
+`setup` needed.
+
+**Moving from an old install** (binary, `.env`, `compose.yaml` and `sudoku-config/` inside the projects folder):
+`setup` finds it by itself — in the current directory, next to the binary and through Docker's containers — and
+offers to move it into `~/.sudoku` together with the data (`sudoku-config/*/data`, backups). Infrastructure containers
+are recreated from the new place; `sudoku_network` and project containers are left alone. Explicitly:
+`sudoku setup --migrate-from <dir>`. The old layout keeps working without moving.
 
 **From source** (needs Go and Node.js/npm):
 
 ```sh
 git clone … && cd sudoku-golang
-cp .env.example .env        # set ROOT_PROJECTS_FOLDER and PREFIX_CONTAINER_NAME
+cp .env.example .env        # optional: template for ~/.sudoku/.env (ROOT_PROJECTS_FOLDER, PREFIX_CONTAINER_NAME)
 make build                  # UI + binary + `sudoku setup` (OVERWRITE_ENV=1 / REGENERATE_COMPOSE=1 to overwrite)
 ```
 
@@ -72,7 +89,7 @@ sudoku exec <service> [-- command...]  # shell or command in a service (-u user,
 sudoku sets list | add <name> <targets...> | rm <name>   # project sets
 sudoku doctor               # diagnostics: docker, compose, socket, projects, ports, permissions (--json)
 sudoku serve                # web admin
-sudoku setup                # bootstrap ROOT_PROJECTS_FOLDER
+sudoku setup                # install / change the projects folder / move an old install
 sudoku update [--check]     # update to the latest release
 sudoku version
 sudoku completion bash|zsh|fish|powershell   # completion (projects, services and sets)
@@ -88,7 +105,7 @@ sudoku logs infra/traefik -f
 sudoku exec billing/db -- psql -U postgres
 ```
 
-Global flags: `--debug`, `--log`, `-C <dir>` (read `.env` from another directory). `start`/`restart`/`rebuild` accept
+Global flags: `--debug`, `--log`, `-C <dir>` (run from another directory; its `.env` is used if it has `ROOT_PROJECTS_FOLDER`). `start`/`restart`/`rebuild` accept
 `--wait` / `--no-wait` (wait for the infrastructure healthchecks) and `--no-preflight` (skip the port conflict
 check). The exit code is 1 if any compose file failed.
 
@@ -98,8 +115,8 @@ check). The exit code is 1 if any compose file failed.
 `--addr` flag overrides it; only loopback addresses are allowed. Enable logs with `--log`.
 The UI is embedded into the binary.
 
-`make build` no longer overwrites an existing `${ROOT_PROJECTS_FOLDER}/compose.yaml` (it holds your edits and ports added
-from the admin). Regenerate it with `REGENERATE_COMPOSE=1 make build` (the old file is kept as `compose.yaml.bak`).
+`make build` does not overwrite an existing `~/.sudoku/compose.yaml` or files in `~/.sudoku/sudoku-config/` (they hold
+your edits and ports added from the admin). Regenerate it with `REGENERATE_COMPOSE=1 make build` (the old file is kept as `compose.yaml.bak`).
 
 Features:
 
@@ -115,7 +132,7 @@ Features:
   Docker disk usage (images, volumes, container layers, build cache). Every container also has a "Resources" tab.
   By default metrics are collected **only while the monitoring page (or a Resources tab) is open**. Settings has a
   background-collection toggle and the polling interval for both modes: live 1–60 s (default 2 s), background
-  5 s – 1 h (default 10 s). Stored in `${ROOT_PROJECTS_FOLDER}/sudoku-config/admin.yaml`;
+  5 s – 1 h (default 10 s). Stored in `~/.sudoku/sudoku-config/admin.yaml`;
 * **Cleanup**: frees disk space by removing unused images, build cache (all of it, or entries older than 1/7/30 days)
   and stopped containers. It shows a preview first and removes only what you tick. **Volumes are never removed**, not
   even with containers: `docker rm` runs without `-v`. Stopped containers with Docker volumes and anything that looks
@@ -123,18 +140,18 @@ Features:
   force, so an image used by any container is refused. The server re-reads Docker state and re-checks every item
   before deleting;
 * **"Don't start"** flag per service: skipped by "start all" / "restart all" and by the CLI `sudoku start`, `restart`,
-  `rebuild`, `build`. Stored in `${ROOT_PROJECTS_FOLDER}/sudoku-config/disabled.yaml` (hand-editable). If an enabled
+  `rebuild`, `build`. Stored in `~/.sudoku/sudoku-config/disabled.yaml` (hand-editable). If an enabled
   service `depends_on` a disabled one, compose still starts it, and the admin warns about that;
 * **Ports**: manages Traefik ports in the root `compose.yaml` (adds/removes `ports:` entries with comments and,
   optionally, entryPoints in `sudoku-config/traefik/traefik.yaml`), shows which containers use each entryPoint and
   applies changes by recreating Traefik. A `*.sudoku.bak` copy is written before every change;
 * **Multi-select**: tick services (or a whole group/table) and start, stop or restart them in one run
   (`compose up -d` / `stop` for just those services of each file), or flag them "don't start" / "start again" at once;
-* **Config editor** (Settings): edits `.env` in the `serve` working directory (`ROOT_PROJECTS_FOLDER`, `DOCKER_PATH`,
+* **Config editor** (Settings): edits the sudoku `.env` (`~/.sudoku/.env`) (`ROOT_PROJECTS_FOLDER`, `DOCKER_PATH`,
   `DOCKER_COMPOSE_PATH`, `MAX_WORKERS`, `ADMIN_ADDR`). Values are validated, other lines and comments are kept, a
   `.env.sudoku.bak` copy is written, and `serve` re-executes itself to apply them. Changing the address warns that the
   current page will stop working and then opens the new address. An enabled autostart unit is refreshed.
-  `make build` no longer overwrites an existing `${ROOT_PROJECTS_FOLDER}/.env` (`OVERWRITE_ENV=1` forces it);
+  `make build` does not overwrite an existing `~/.sudoku/.env` (`OVERWRITE_ENV=1` forces it);
 * **Settings**: autostart of `sudoku serve` at login (macOS LaunchAgent, Linux `systemd --user`) and re-enabling
   confirmations hidden with "don't show again";
 * optionally shows foreign compose containers (outside `ROOT_PROJECTS_FOLDER`), read-only.
@@ -182,10 +199,12 @@ The UI design system lives in `.agents/design/`.
 
 ## Configuration 🔧
 
-Configuration comes from `.env` in the working directory (or `-C <dir>`), environment variables or
-`/vault/secrets/CRED_<NAME>`.
+Configuration comes from `.env` in the sudoku directory — `$SUDOKU_HOME`, else the current directory when its `.env`
+has `ROOT_PROJECTS_FOLDER` (old layout, repository checkout), else `~/.sudoku` —, environment variables or
+`/vault/secrets/CRED_<NAME>`. The same directory holds the infrastructure `compose.yaml` and `sudoku-config/` (in the
+old layout they sit in `ROOT_PROJECTS_FOLDER` until `sudoku setup` moves them).
 
-* `ROOT_PROJECTS_FOLDER` — the projects root (required)
+* `ROOT_PROJECTS_FOLDER` — the projects folder (required; `~` and relative paths resolve against the sudoku directory)
 * `DOCKER_PATH` — docker command (default `docker` from PATH; paths with spaces are fine)
 * `DOCKER_COMPOSE_PATH` — compose command (default `docker-compose` if installed, else `docker compose`)
 * `MAX_WORKERS` — stop/down parallelism (1–64, default 5)
@@ -197,7 +216,7 @@ The Docker Engine is located like the docker CLI does: `DOCKER_HOST` (unix, `npi
 `DOCKER_TLS_VERIFY`/`DOCKER_CERT_PATH`), then the current `docker context`, then the default socket / named pipe.
 
 Admin and CLI settings (startup order, notifications, schedules, backups, metrics) live in
-`${ROOT_PROJECTS_FOLDER}/sudoku-config/admin.yaml`, sets in `sets.yaml`, disabled services in `disabled.yaml`.
+`~/.sudoku/sudoku-config/admin.yaml`, sets in `sets.yaml`, disabled services in `disabled.yaml`.
 
 Autostart of `sudoku serve` at login: macOS LaunchAgent, Linux `systemd --user`, Windows a hidden launcher in the
 Startup folder.

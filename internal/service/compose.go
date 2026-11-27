@@ -72,21 +72,22 @@ func NewComposer(log *slog.Logger, cfg *configs.Config, opts Options) (*Composer
 		cfg:      cfg,
 		runner:   docker.NewRunner(cfg.DockerPath, cfg.DockerComposePath, os.Environ()),
 		opts:     opts,
-		disabled: NewDisabledStore(cfg.RootProjectsFolder),
+		disabled: NewDisabledStore(LayoutOf(cfg)),
 	}
-	if p, err := prefs.Load(prefs.Path(cfg.RootProjectsFolder)); err == nil {
+	l := LayoutOf(cfg)
+	if p, err := prefs.Load(prefs.Path(l.Data)); err == nil {
 		c.prefs = p.Normalized()
 	} else {
 		c.prefs = prefs.Prefs{}.Normalized()
 	}
-	files, err := DiscoverComposeFiles(cfg.RootProjectsFolder)
+	files, err := l.Discover()
 	if err != nil {
 		return nil, err
 	}
-	projects := ProjectsFrom(cfg.RootProjectsFolder, files)
+	projects := l.Projects(files)
 	targets := append([]string{}, opts.Targets...)
 	if len(opts.Sets) > 0 {
-		fromSets, err := NewSetsStore(cfg.RootProjectsFolder).Expand(opts.Sets)
+		fromSets, err := NewSetsStore(l).Expand(opts.Sets)
 		if err != nil {
 			return nil, err
 		}

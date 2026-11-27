@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
-# Сборка (админка + бинарник) и деплой в ROOT_PROJECTS_FOLDER.
-# Деплой делает сам бинарник (`sudoku setup`) — та же логика работает на Windows без bash.
-#   OVERWRITE_ENV=1       перезаписать .env в корне (старый → .env.bak)
-#   REGENERATE_COMPOSE=1  перегенерировать compose.yaml (старый → compose.yaml.bak)
+# Сборка (админка + бинарник) и установка: бинарник в ~/.local/bin, .env/compose.yaml/sudoku-config в ~/.sudoku.
+# Установку делает сам бинарник (`sudoku setup`) — та же логика работает на Windows без bash.
+# .env репозитория (если есть) — шаблон для ~/.sudoku/.env и источник ROOT_PROJECTS_FOLDER.
+#   OVERWRITE_ENV=1       пересоздать ~/.sudoku/.env (старый → .env.bak)
+#   REGENERATE_COMPOSE=1  перегенерировать ~/.sudoku/compose.yaml (старый → compose.yaml.bak)
 set -euo pipefail
 IFS=$'\n\t'
 
@@ -10,8 +11,6 @@ die() {
     echo "❌ $*" >&2
     exit 1
 }
-
-[[ -f .env ]] || die ".env не найден (пример: .env.example)"
 
 mkdir -p build
 
@@ -26,6 +25,10 @@ echo "🚀 Собираю sudoku ${VERSION}..."
 go build -trimpath -ldflags "-s -w -X sudoku-golang/internal/version.Version=${VERSION}" -o build/sudoku ./cmd/main.go
 
 args=()
+if [[ -f .env ]]; then
+    root=$(grep -E '^[[:space:]]*ROOT_PROJECTS_FOLDER=' .env | tail -n1 | cut -d= -f2- | tr -d '"'"'"'\r' || true)
+    [[ -n "${root}" ]] && args+=(--root "${root}")
+fi
 [[ "${OVERWRITE_ENV:-0}" == "1" ]] && args+=(--overwrite-env)
 [[ "${REGENERATE_COMPOSE:-0}" == "1" ]] && args+=(--regenerate-compose)
 

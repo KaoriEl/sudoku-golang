@@ -30,21 +30,13 @@ type Entry struct {
 	Services []string
 }
 
-// ProjectsFrom turns discovered compose files into projects: the folder name is the project name, the
-// root compose.yaml is "infra".
-func ProjectsFrom(root string, files []string) []Project {
-	abs, err := filepath.Abs(root)
-	if err != nil {
-		abs = root
-	}
+// Projects turns discovered compose files into projects: the folder name is the project name, the
+// infra compose.yaml is "infra".
+func (l Layout) Projects(files []string) []Project {
 	out := make([]Project, 0, len(files))
 	for _, f := range files {
-		rel, err := filepath.Rel(abs, f)
-		if err != nil {
-			rel = f
-		}
-		p := Project{File: f, Rel: filepath.ToSlash(rel), Name: filepath.Base(filepath.Dir(f))}
-		if filepath.Dir(rel) == "." {
+		p := Project{File: f, Rel: l.Rel(f), Name: filepath.Base(filepath.Dir(f))}
+		if l.IsInfra(f) {
 			p.Infra, p.Name = true, InfraName
 		}
 		out = append(out, p)

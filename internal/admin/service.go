@@ -42,6 +42,7 @@ type Service struct {
 	files    sync.Mutex
 	runCtx   context.Context
 	addr     string
+	layout   service.Layout
 	disabled *service.DisabledStore
 	sets     *service.SetsStore
 	svcCache *servicesCache
@@ -66,7 +67,7 @@ type Service struct {
 
 func NewService(log *slog.Logger, cfg *configs.Config, runner *docker.Runner, collector *metrics.Collector) *Service {
 	eng := collector.Engine()
-	root, _ := filepath.Abs(cfg.RootProjectsFolder)
+	layout := service.LayoutOf(cfg)
 	s := &Service{
 		log:      log,
 		cfg:      cfg,
@@ -74,20 +75,21 @@ func NewService(log *slog.Logger, cfg *configs.Config, runner *docker.Runner, co
 		source:   containers.NewSource(log, eng, runner),
 		engine:   eng,
 		runCtx:   context.Background(),
-		disabled: service.NewDisabledStore(cfg.RootProjectsFolder),
-		sets:     service.NewSetsStore(cfg.RootProjectsFolder),
+		layout:   layout,
+		disabled: service.NewDisabledStore(layout),
+		sets:     service.NewSetsStore(layout),
 		svcCache: &servicesCache{entries: map[string]servicesEntry{}},
 		metrics:  collector,
-		prefs:    prefs.NewStore(cfg.RootProjectsFolder),
+		prefs:    prefs.NewStore(layout.Data),
 		hub:      newHub(),
-		history:  newRunHistory(log, root),
+		history:  newRunHistory(log, layout.ConfigDir()),
 		updates:  updates.NewChecker(eng),
 	}
 	s.runs = newRunManager(s.history, s.onRunChange)
 	s.alerts = newAlerter(s)
 	s.backups = backup.NewManager(log, eng, runner, func() string {
 		p, _ := s.prefs.Get()
-		return p.BackupDir(root)
+		return p.BackupDir(layout.Data)
 	})
 	s.scheduler = newScheduler(s)
 	p, err := s.prefs.Get()
@@ -113,22 +115,16 @@ func (s *Service) SetAuth(token string, unixSocket bool) {
 }
 
 func (s *Service) composeFiles() ([]ComposeFile, map[string]string, error) {
-	found, err := service.DiscoverComposeFiles(s.cfg.RootProjectsFolder)
+	found, err := s.layout.Discover()
 	if err != nil {
 		return nil, nil, fmt.Errorf("discover compose files: %w", err)
 	}
 
-	root, _ := filepath.Abs(s.cfg.RootProjectsFolder)
 	files := make([]ComposeFile, 0, len(found))
 	known := make(map[string]string, len(found))
 	for _, p := range found {
-		rel, relErr := filepath.Rel(root, p)
-		if relErr != nil {
-			rel = p
-		}
-		infra := filepath.Dir(rel) == "."
 		project := filepath.Base(filepath.Dir(p))
-		files = append(files, ComposeFile{Path: p, Rel: filepath.ToSlash(rel), Project: project, Infra: infra})
+		files = append(files, ComposeFile{Path: p, Rel: s.layout.Rel(p), Project: project, Infra: s.layout.IsInfra(p)})
 		known[paths.Normalize(p)] = p
 	}
 	return files, known, nil
@@ -171,9 +167,8 @@ func (s *Service) Snapshot(ctx context.Context) (Snapshot, error) {
 		return list[i].Name < list[j].Name
 	})
 
-	root, _ := filepath.Abs(s.cfg.RootProjectsFolder)
 	return Snapshot{
-		Root:         root,
+		Root:         s.layout.Root,
 		ComposeFiles: files,
 		Containers:   list,
 		Run:          s.runs.latestSummary(),

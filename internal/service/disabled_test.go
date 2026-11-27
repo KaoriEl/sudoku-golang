@@ -16,7 +16,7 @@ const (
 func TestDisabledStore(t *testing.T) {
 	root := t.TempDir()
 	file := filepath.Join(root, "alpha", "compose-sudoku.yaml")
-	d := NewDisabledStore(root)
+	d := NewDisabledStore(Layout{Data: root, Root: root})
 
 	got, err := d.For(file)
 	if err != nil || len(got) != 0 {
@@ -29,7 +29,7 @@ func TestDisabledStore(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	raw, err := os.ReadFile(DisabledPath(root))
+	raw, err := os.ReadFile(DisabledPath(Layout{Data: root, Root: root}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,7 +37,7 @@ func TestDisabledStore(t *testing.T) {
 		t.Fatalf("unexpected file:\n%s", raw)
 	}
 
-	fresh := NewDisabledStore(root)
+	fresh := NewDisabledStore(Layout{Data: root, Root: root})
 	got, _ = fresh.For(file)
 	if !reflect.DeepEqual(got, []string{svcMySQL, svcPgSQL}) {
 		t.Fatalf("got %v", got)
@@ -49,7 +49,7 @@ func TestDisabledStore(t *testing.T) {
 	if err := fresh.Set(file, svcPgSQL, false); err != nil {
 		t.Fatal(err)
 	}
-	raw, _ = os.ReadFile(DisabledPath(root))
+	raw, _ = os.ReadFile(DisabledPath(Layout{Data: root, Root: root}))
 	if strings.Contains(string(raw), "alpha") {
 		t.Fatalf("entry not removed:\n%s", raw)
 	}

@@ -128,11 +128,11 @@ func completeTargets(a *app) func(*cobra.Command, []string, string) ([]string, c
 		if !completionApp(a) {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		files, err := service.DiscoverComposeFiles(a.cfg.RootProjectsFolder)
+		files, err := service.DiscoverComposeFiles(a.cfg)
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		projects := service.ProjectsFrom(a.cfg.RootProjectsFolder, files)
+		projects := service.LayoutOf(a.cfg).Projects(files)
 		if proj, _, ok := strings.Cut(toComplete, "/"); ok {
 			c, err := service.NewComposer(a.log, a.cfg, service.Options{})
 			if err != nil {
@@ -163,7 +163,7 @@ func completeSets(a *app) func(*cobra.Command, []string, string) ([]string, cobr
 		if !completionApp(a) {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		sets, err := service.NewSetsStore(a.cfg.RootProjectsFolder).List()
+		sets, err := service.NewSetsStore(service.LayoutOf(a.cfg)).List()
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}

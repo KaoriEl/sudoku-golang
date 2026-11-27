@@ -37,23 +37,39 @@ sudoku работает на **Linux, macOS и Windows** (amd64 и arm64): од�
 Нужен только Docker (Docker Desktop, Colima, OrbStack, Rancher Desktop или dockerd) с compose (`docker compose`
 или `docker-compose`).
 
-**Готовый релиз** (рекомендуется): скачайте архив своей платформы со страницы релизов, распакуйте и выполните
+**Готовый релиз** (рекомендуется): скачайте со страницы релизов архив своей платформы
+(`darwin_arm64` — Mac на M-чипе, `darwin_amd64` — Mac на Intel, `linux_*`, `windows_*`), распакуйте и выполните
 
 ```sh
-./sudoku setup --root ~/projects --prefix dev   # Windows: .\sudoku.exe setup --root C:\projects --prefix dev
-cd ~/projects && ./sudoku doctor && ./sudoku start
+xattr -d com.apple.quarantine ./sudoku   # только macOS: бинарник не подписан
+./sudoku setup                           # Windows: .\sudoku.exe setup
 ```
 
-`setup` копирует бинарник в `ROOT_PROJECTS_FOLDER`, создаёт `.env` (если его нет), раскладывает `sudoku-config/`
-(встроен в бинарник) и генерирует корневой `compose.yaml` с префиксом имён контейнеров. Существующие файлы не
-трогает без `--overwrite-env` / `--regenerate-compose` (старые сохраняются в `.bak`). Дальнейшие обновления:
-`./sudoku update` (проверяет SHA-256 из `checksums.txt` релиза).
+`setup` спросит папку с проектами и префикс контейнеров, покажет, что куда поставит, и установит:
+
+| Что | Куда |
+|---|---|
+| команда `sudoku` | `~/.local/bin` (Windows: `%LOCALAPPDATA%\Programs\sudoku`), предложит добавить в PATH |
+| настройки `.env`, `compose.yaml` инфраструктуры, `sudoku-config/`, бэкапы | `~/.sudoku` (или `$SUDOKU_HOME`) |
+| ваши проекты | остаются где были: `<папка проектов>/<проект>/compose-sudoku.yaml` |
+
+После этого скачанный архив можно удалить, а `sudoku` работает из любой папки: `sudoku doctor`, `sudoku start`,
+`sudoku serve`. Папку проектов можно сменить в любой момент (`sudoku setup` или настройки админки) — инфраструктура
+от неё не зависит. Повторный `setup` безопасен: существующие файлы не перезаписываются (кроме `--overwrite-env` /
+`--regenerate-compose`, старые сохраняются в `.bak`). Без вопросов: `sudoku setup --root ~/projects --prefix dev --yes`.
+Обновление: `sudoku update` (проверяет SHA-256 из `checksums.txt` релиза), повторно `setup` не нужен.
+
+**Переезд со старой установки** (когда `sudoku`, `.env`, `compose.yaml` и `sudoku-config/` лежали прямо в папке
+проектов): `setup` находит её сам — в текущей папке, рядом с бинарником и по контейнерам Docker — и предлагает
+перенести в `~/.sudoku` вместе с данными (`sudoku-config/*/data`, бэкапы). Контейнеры инфраструктуры пересоздаются из
+нового места, сеть `sudoku_network` и контейнеры проектов не трогаются. Явно: `sudoku setup --migrate-from <папка>`.
+Старая раскладка без переноса продолжает работать.
 
 **Из исходников** (нужны Go и Node.js/npm):
 
 ```sh
 git clone … && cd sudoku-golang
-cp .env.example .env        # укажите ROOT_PROJECTS_FOLDER и PREFIX_CONTAINER_NAME
+cp .env.example .env        # необязательно: шаблон для ~/.sudoku/.env (ROOT_PROJECTS_FOLDER, PREFIX_CONTAINER_NAME)
 make build                  # UI + бинарник + `sudoku setup` (OVERWRITE_ENV=1 / REGENERATE_COMPOSE=1 — перезаписать)
 ```
 
@@ -72,7 +88,7 @@ sudoku exec <сервис> [-- команда...]   # shell или команд�
 sudoku sets list | add <имя> <цели...> | rm <имя>   # наборы проектов
 sudoku doctor               # диагностика: docker, compose, сокет, проекты, порты, права (--json)
 sudoku serve                # веб-админка
-sudoku setup                # развернуть в ROOT_PROJECTS_FOLDER
+sudoku setup                # установка / смена папки проектов / перенос старой установки
 sudoku update [--check]     # обновиться до последнего релиза
 sudoku version
 sudoku completion bash|zsh|fish|powershell   # автодополнение (дополняет проекты, сервисы и наборы)
@@ -89,8 +105,8 @@ sudoku logs infra/traefik -f
 sudoku exec billing/db -- psql -U postgres
 ```
 
-Глобальные флаги: `--debug` (печатать каждую команду), `--log` (подробный JSON-лог), `-C <папка>` (читать `.env`
-из другой папки). `start`/`restart`/`rebuild` принимают `--wait` / `--no-wait` (ждать healthcheck инфраструктуры) и
+Глобальные флаги: `--debug` (печатать каждую команду), `--log` (подробный JSON-лог), `-C <папка>` (запуск из
+другой папки; её `.env` используется, если в нём есть `ROOT_PROJECTS_FOLDER`). `start`/`restart`/`rebuild` принимают `--wait` / `--no-wait` (ждать healthcheck инфраструктуры) и
 `--no-preflight` (не проверять занятые порты). При ошибке хотя бы в одном файле код выхода — 1.
 
 Автодополнение: `source <(sudoku completion zsh)` (zsh/bash), `sudoku completion powershell | Out-String | Invoke-Expression`.
@@ -118,7 +134,7 @@ sudoku exec billing/db -- psql -U postgres
   спарклайнами, место на диске Docker (образы, тома, слои, кэш сборки). У каждого контейнера есть вкладка «Ресурсы».
   По умолчанию метрики собираются **только пока открыт мониторинг** (или вкладка «Ресурсы»). В «Настройках» можно
   включить фоновый сбор и задать частоту для обоих режимов: при просмотре 1–60 с (по умолчанию 2 с), в фоне
-  5 с – 1 ч (по умолчанию 10 с). Хранится в `${ROOT_PROJECTS_FOLDER}/sudoku-config/admin.yaml`;
+  5 с – 1 ч (по умолчанию 10 с). Хранится в `~/.sudoku/sudoku-config/admin.yaml`;
 * **Очистка** — освобождает место: неиспользуемые образы, кэш сборки (весь или старше суток / 7 / 30 дней) и
   остановленные контейнеры. Сначала показывает, что и сколько освободится, удаляет только отмеченное. **Тома не
   удаляются никогда**, в том числе вместе с контейнерами: `docker rm` вызывается без `-v`. Остановленные контейнеры с
@@ -126,7 +142,7 @@ sudoku exec billing/db -- psql -U postgres
   Образы удаляются без `--force`, поэтому образ, который использует хоть один контейнер, не удалится. Перед удалением
   сервер заново читает состояние Docker и перепроверяет каждый пункт;
 * **«Не запускать»** — флаг на сервисе: он пропускается при «Запустить все», «Перезапустить все», а также в CLI
-  `sudoku start`, `restart`, `rebuild`, `build`. Список хранится в `${ROOT_PROJECTS_FOLDER}/sudoku-config/disabled.yaml`
+  `sudoku start`, `restart`, `rebuild`, `build`. Список хранится в `~/.sudoku/sudoku-config/disabled.yaml`
   (его можно править руками). Если от отключённого сервиса зависит включённый (`depends_on`), compose всё равно его
   поднимет — админка об этом предупреждает;
 * **Порты** — управляет портами Traefik в корневом `compose.yaml`: добавляет строку в `ports:` (с комментарием) и при
@@ -136,8 +152,8 @@ sudoku exec billing/db -- psql -U postgres
   остановить, перезапустить одним запуском (`compose up -d / stop` по нужным сервисам каждого файла) или разом
   отметить «не запускать» / «снова запускать»;
 * **Настройки** — автозапуск `sudoku serve` при входе в систему (macOS: LaunchAgent, Linux: `systemd --user`),
-  возврат подтверждений, отключённых галочкой «Больше не показывать», и **редактор конфига** — `.env` в рабочей
-  папке `serve` (`ROOT_PROJECTS_FOLDER`, `DOCKER_PATH`, `DOCKER_COMPOSE_PATH`, `MAX_WORKERS`, `ADMIN_ADDR`).
+  возврат подтверждений, отключённых галочкой «Больше не показывать», и **редактор конфига** — `.env` sudoku
+  (`~/.sudoku/.env`) (`ROOT_PROJECTS_FOLDER`, `DOCKER_PATH`, `DOCKER_COMPOSE_PATH`, `MAX_WORKERS`, `ADMIN_ADDR`).
   Значения проверяются, остальные строки файла и комментарии сохраняются, перед записью делается `.env.sudoku.bak`,
   после сохранения `serve` перезапускает сам себя. При смене адреса админка предупреждает, что текущая страница
   перестанет работать, и после перезапуска открывает новый адрес. Включённый автозапуск обновляется;
@@ -170,9 +186,9 @@ sudoku exec billing/db -- psql -U postgres
   расписанию;
 * **Диагностика** — то же, что `sudoku doctor`, на странице «Настройки».
 
-`make build` больше не перезаписывает существующий `${ROOT_PROJECTS_FOLDER}/compose.yaml` — там ваши правки и порты из
-админки. Перегенерировать его из `sudoku-config/compose.yaml`: `REGENERATE_COMPOSE=1 make build` (старый файл
-сохранится в `compose.yaml.bak`).
+`make build` не перезаписывает существующий `~/.sudoku/compose.yaml` и файлы в `~/.sudoku/sudoku-config/` — там ваши
+правки и порты из админки. Перегенерировать compose из `sudoku-config/compose.yaml`: `REGENERATE_COMPOSE=1 make build`
+(старый файл сохранится в `compose.yaml.bak`).
 
 Безопасность: сервер слушает только loopback (`localhost`, `127.0.0.1`, `::1`) или unix-сокет
 (`ADMIN_ADDR=unix:/путь/sudoku.sock`, права 0600), отклоняет запросы с чужих сайтов (`Sec-Fetch-Site`, `Origin`,
@@ -193,10 +209,12 @@ make web-dev     # Vite dev-сервер на :5173 с проксировани�
 
 ## Настройка 🔧
 
-Конфигурация загружается из `.env` в рабочей папке (или `-C <папка>`), переменных окружения или
-`/vault/secrets/CRED_<ИМЯ>`.
+Конфигурация загружается из `.env` в папке sudoku — `$SUDOKU_HOME`, иначе текущая папка, если в её `.env` есть
+`ROOT_PROJECTS_FOLDER` (старая раскладка, checkout репозитория), иначе `~/.sudoku`, — из переменных окружения или
+`/vault/secrets/CRED_<ИМЯ>`. В той же папке лежат `compose.yaml` инфраструктуры и `sudoku-config/` (в старой
+раскладке — в `ROOT_PROJECTS_FOLDER`, пока не перенесёте их `sudoku setup`).
 
-* `ROOT_PROJECTS_FOLDER` — корневая папка проектов (обязательно)
+* `ROOT_PROJECTS_FOLDER` — папка проектов (обязательно; `~` и относительные пути раскрываются от папки sudoku)
 * `DOCKER_PATH` — команда docker (по умолчанию `docker` из PATH; путь с пробелами допустим)
 * `DOCKER_COMPOSE_PATH` — команда compose (по умолчанию `docker-compose`, если установлен, иначе `docker compose`)
 * `MAX_WORKERS` — параллельность stop/down (1–64, по умолчанию 5)
@@ -208,7 +226,7 @@ Docker Engine находится так же, как у docker CLI: `DOCKER_HOST
 `DOCKER_TLS_VERIFY`/`DOCKER_CERT_PATH`), затем текущий `docker context`, затем стандартный сокет / named pipe.
 
 Настройки админки и CLI (порядок запуска, уведомления, расписания, бэкапы, метрики) — в
-`${ROOT_PROJECTS_FOLDER}/sudoku-config/admin.yaml`, наборы — в `sets.yaml`, отключённые сервисы — в `disabled.yaml`.
+`~/.sudoku/sudoku-config/admin.yaml`, наборы — в `sets.yaml`, отключённые сервисы — в `disabled.yaml`.
 
 Автозапуск `sudoku serve` при входе: macOS — LaunchAgent, Linux — `systemd --user`, Windows — скрытый запуск из папки
 «Автозагрузка».

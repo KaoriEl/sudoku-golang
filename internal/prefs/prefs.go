@@ -1,4 +1,4 @@
-// Package prefs is ${ROOT}/sudoku-config/admin.yaml: settings shared by the CLI and the admin panel
+// Package prefs is <data dir>/sudoku-config/admin.yaml: settings shared by the CLI and the admin panel
 // (metrics, startup order, notifications, schedules, backups).
 package prefs
 
@@ -128,7 +128,7 @@ func Path(root string) string {
 	return filepath.Join(abs, "sudoku-config", "admin.yaml")
 }
 
-// BackupDir is where database dumps go: prefs value, or ${ROOT}/backups.
+// BackupDir is where database dumps go: prefs value, or <data dir>/backups.
 func (p Prefs) BackupDir(root string) string {
 	if p.Backups.Dir != "" {
 		if filepath.IsAbs(p.Backups.Dir) {

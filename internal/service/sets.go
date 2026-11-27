@@ -38,7 +38,7 @@ type setsFile struct {
 	Sets map[string]Set `yaml:"sets"`
 }
 
-// SetsStore is ${ROOT}/sudoku-config/sets.yaml, reloaded when its mtime changes (it may be edited by
+// SetsStore is <data dir>/sudoku-config/sets.yaml, reloaded when its mtime changes (it may be edited by
 // hand or by another sudoku process).
 type SetsStore struct {
 	mu    sync.Mutex
@@ -47,16 +47,12 @@ type SetsStore struct {
 	mtime int64
 }
 
-func SetsPath(root string) string {
-	return filepath.Join(root, "sudoku-config", "sets.yaml")
+func SetsPath(l Layout) string {
+	return filepath.Join(l.ConfigDir(), "sets.yaml")
 }
 
-func NewSetsStore(root string) *SetsStore {
-	abs, err := filepath.Abs(root)
-	if err != nil {
-		abs = root
-	}
-	return &SetsStore{path: SetsPath(abs), data: map[string]Set{}}
+func NewSetsStore(l Layout) *SetsStore {
+	return &SetsStore{path: SetsPath(l), data: map[string]Set{}}
 }
 
 func (s *SetsStore) Path() string {

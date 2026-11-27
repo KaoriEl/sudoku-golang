@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/http"
-	"path/filepath"
 	"strings"
 	"sudoku-golang/internal/service"
 )
@@ -28,12 +27,11 @@ func (s *Service) projects(ctx context.Context) ([]ComposeFile, []service.Projec
 		return nil, nil
 	}
 	files = s.withServices(ctx, files)
-	root, _ := filepath.Abs(s.cfg.RootProjectsFolder)
 	paths := make([]string, 0, len(files))
 	for _, f := range files {
 		paths = append(paths, f.Path)
 	}
-	projects := service.ProjectsFrom(root, paths)
+	projects := s.layout.Projects(paths)
 	for i := range projects {
 		projects[i].Services = files[i].Services
 	}

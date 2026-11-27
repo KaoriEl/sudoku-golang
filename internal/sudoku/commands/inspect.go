@@ -84,7 +84,7 @@ func ports(c admin.Container) string {
 }
 
 // filterSnapshot keeps the containers matched by targets (resolved against the snapshot's files).
-func filterSnapshot(snap admin.Snapshot, root string, targets []string) ([]admin.Container, error) {
+func filterSnapshot(snap admin.Snapshot, l service.Layout, targets []string) ([]admin.Container, error) {
 	if len(targets) == 0 {
 		return snap.Containers, nil
 	}
@@ -93,7 +93,7 @@ func filterSnapshot(snap admin.Snapshot, root string, targets []string) ([]admin
 	for _, f := range snap.ComposeFiles {
 		files = append(files, f.Path)
 	}
-	projects = append(projects, service.ProjectsFrom(root, files)...)
+	projects = append(projects, l.Projects(files)...)
 	for i := range projects {
 		projects[i].Services = snap.ComposeFiles[i].Services
 	}
@@ -132,7 +132,7 @@ func commandStatus(a *app) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			list, err := filterSnapshot(snap, a.cfg.RootProjectsFolder, args)
+			list, err := filterSnapshot(snap, service.LayoutOf(a.cfg), args)
 			if err != nil {
 				return err
 			}
@@ -334,7 +334,7 @@ func commandSets(a *app) *cobra.Command {
 	list := &cobra.Command{
 		Use: "list", Aliases: []string{"ls"}, Short: "Показать наборы", Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			sets, err := service.NewSetsStore(a.cfg.RootProjectsFolder).List()
+			sets, err := service.NewSetsStore(service.LayoutOf(a.cfg)).List()
 			if err != nil {
 				return err //nolint:wrapcheck // descriptive
 			}
@@ -359,7 +359,7 @@ func commandSets(a *app) *cobra.Command {
 			if err != nil {
 				return err //nolint:wrapcheck // validates the targets
 			}
-			set, err := service.NewSetsStore(a.cfg.RootProjectsFolder).Upsert(service.Set{Name: args[0], Description: desc, Targets: args[1:]})
+			set, err := service.NewSetsStore(service.LayoutOf(a.cfg)).Upsert(service.Set{Name: args[0], Description: desc, Targets: args[1:]})
 			if err != nil {
 				return err //nolint:wrapcheck // descriptive
 			}
@@ -372,7 +372,7 @@ func commandSets(a *app) *cobra.Command {
 		Use: "rm <имя>", Aliases: []string{"delete"}, Short: "Удалить набор", Args: cobra.ExactArgs(1),
 		ValidArgsFunction: completeSets(a),
 		RunE: func(_ *cobra.Command, args []string) error {
-			if err := service.NewSetsStore(a.cfg.RootProjectsFolder).Delete(args[0]); err != nil {
+			if err := service.NewSetsStore(service.LayoutOf(a.cfg)).Delete(args[0]); err != nil {
 				return err //nolint:wrapcheck // descriptive
 			}
 			clime.SuccessLine("Набор удалён: " + args[0])

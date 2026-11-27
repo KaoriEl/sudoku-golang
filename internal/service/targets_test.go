@@ -2,6 +2,7 @@ package service
 
 import (
 	"errors"
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -69,22 +70,30 @@ func TestNeedsServices(t *testing.T) {
 
 func TestProjectsFrom(t *testing.T) {
 	root := t.TempDir()
-	got := ProjectsFrom(root, []string{filepath.Join(root, "compose.yaml"), filepath.Join(root, "shop", "compose-sudoku.yaml")})
+	l := Layout{Data: root, Root: root}
+	got := l.Projects([]string{filepath.Join(root, "compose.yaml"), filepath.Join(root, "shop", "compose-sudoku.yaml")})
 	if !got[0].Infra || got[0].Name != InfraName || got[1].Name != "shop" || got[1].Rel != "shop/compose-sudoku.yaml" {
 		t.Fatalf("%+v", got)
+	}
+
+	home := t.TempDir()
+	l = Layout{Data: home, Root: root}
+	got = l.Projects([]string{filepath.Join(home, "compose.yaml"), filepath.Join(root, "shop", "compose-sudoku.yaml")})
+	if !got[0].Infra || got[0].Rel != "compose.yaml" || got[1].Infra || got[1].Rel != "shop/compose-sudoku.yaml" {
+		t.Fatalf("separate home: %+v", got)
 	}
 }
 
 func TestSetsStore(t *testing.T) {
 	root := t.TempDir()
-	s := NewSetsStore(root)
+	s := NewSetsStore(Layout{Data: root, Root: root})
 	if _, err := s.Upsert(Set{Name: "bad name"}); !errors.Is(err, ErrBadSetName) {
 		t.Fatalf("bad name accepted: %v", err)
 	}
 	if _, err := s.Upsert(Set{Name: "backend", Targets: []string{" api ", "api", "infra"}, Description: "a\nb"}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := NewSetsStore(root).Get("backend")
+	got, err := NewSetsStore(Layout{Data: root, Root: root}).Get("backend")
 	if err != nil || !reflect.DeepEqual(got.Targets, []string{"api", "infra"}) || got.Description != "a b" {
 		t.Fatalf("reload: %+v %v", got, err)
 	}
@@ -97,5 +106,30 @@ func TestSetsStore(t *testing.T) {
 	}
 	if _, err := s.Get("backend"); !errors.Is(err, ErrSetNotFound) {
 		t.Fatalf("after delete: %v", err)
+	}
+}
+
+func TestDiscoverSeparateHome(t *testing.T) {
+	home, root := t.TempDir(), t.TempDir()
+	for _, p := range []string{
+		filepath.Join(home, "compose.yaml"),
+		filepath.Join(root, "compose.yaml"),
+		filepath.Join(root, "shop", "compose-sudoku.yaml"),
+		filepath.Join(root, "old_noscan", "compose-sudoku.yaml"),
+	} {
+		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(p, []byte("services: {}\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	got, err := Layout{Data: home, Root: root}.Discover()
+	want := []string{filepath.Join(home, "compose.yaml"), filepath.Join(root, "shop", "compose-sudoku.yaml")}
+	if err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %v %v, want %v", got, err, want)
+	}
+	if _, err := (Layout{Data: t.TempDir()}).Discover(); !errors.Is(err, ErrRootNotSet) {
+		t.Fatalf("no infra and no root: %v", err)
 	}
 }
