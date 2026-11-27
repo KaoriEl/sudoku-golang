@@ -1,42 +1,32 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
-	"sudoku-golang/internal/infra/configs"
-	"sudoku-golang/internal/logger"
+	"sudoku-golang/internal/doctor"
+	"sudoku-golang/internal/selfupdate"
+	"sudoku-golang/internal/service"
 	"sudoku-golang/internal/sudoku"
 
 	"github.com/alperdrsnn/clime"
 )
 
 func main() {
-	clime.Header("🧩  Sudoku Golang CLI 🧩")
-
-	log := logger.NewLogger(false)
-	log.Info("Logger initialized", "logEnabled", false)
-
-	cfg, err := configs.MustLoad()
-	if err != nil {
-		clime.ErrorLine("Failed to load config: " + err.Error())
+	selfupdate.CleanupOld()
+	if err := run(); err != nil {
+		if !errors.Is(err, service.ErrFailed) && !errors.Is(err, doctor.ErrFailed) {
+			clime.ErrorLine(err.Error())
+		}
 		os.Exit(1)
 	}
+}
 
-	clime.InfoLine("Config loaded successfully")
-
-	if err := func() (err error) {
-		defer func() {
-			if r := recover(); r != nil {
-				clime.ErrorLine("Application panicked: " + fmt.Sprint(r))
-				err = fmt.Errorf("panic occurred: %v", r)
-			}
-		}()
-
-		return sudoku.Run(log, cfg)
-	}(); err != nil {
-		clime.ErrorLine("Application finished with error: " + err.Error())
-		os.Exit(1)
-	}
-
-	clime.SuccessLine("Application finished successfully!")
+func run() (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic: %v", r)
+		}
+	}()
+	return sudoku.Run() //nolint:wrapcheck // errors are already user-facing
 }

@@ -1,2 +1,36 @@
+# IDE / OS
 .idea
+.vscode
+.DS_Store
+Thumbs.db
+
+# Local env
 .env
+.env.*
+!.env.example
+
+# Build artifacts
+/build
+/dist
+/coverage.out
+*.test
+web/node_modules
+web/*.tsbuildinfo
+internal/webui/dist/*
+!internal/webui/dist/.gitkeep
+
+# AI tooling / local notes
+.agents
+.claude
+ai_context
+collect_go.sh
+CLAUDE.md
+IDEAS.md
+
+# Runtime data written by sudoku
+/backups
+*.sudoku.bak
+sudoku-config/runs
+sudoku-config/admin.yaml
+sudoku-config/disabled.yaml
+sudoku-config/sets.yaml
