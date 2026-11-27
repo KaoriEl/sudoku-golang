@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"runtime"
 	"sudoku-golang/internal/infra/configs"
 	"sudoku-golang/internal/logger"
 	"sudoku-golang/internal/version"
@@ -49,6 +50,25 @@ func (a *app) load() error {
 	return nil
 }
 
+// checkRoot stops commands early when there is no projects folder yet (typically a freshly
+// downloaded binary run before `sudoku setup`), instead of silently doing nothing.
+func checkRoot(root string) error {
+	if st, err := os.Stat(root); err == nil && st.IsDir() {
+		return nil
+	}
+	exe := "./sudoku"
+	if runtime.GOOS == "windows" {
+		exe = `.\sudoku.exe`
+	}
+	src := "ROOT_PROJECTS_FOLDER из .env"
+	if configs.Source("ROOT_PROJECTS_FOLDER") == "default" {
+		src = "в текущей папке нет .env, ROOT_PROJECTS_FOLDER по умолчанию"
+	}
+	return fmt.Errorf("папка проектов %q не найдена (%s).\n"+
+		"Первый запуск: %s setup --root <папка с проектами> --prefix dev\n"+
+		"Затем запускайте sudoku из этой папки или с -C <папка>", root, src, exe)
+}
+
 func noConfig(cmd *cobra.Command) *cobra.Command {
 	if cmd.Annotations == nil {
 		cmd.Annotations = map[string]string{}
@@ -85,7 +105,13 @@ func Root() *cobra.Command {
 				a.log = logger.NewLogger(a.logEnabled)
 				return nil
 			}
-			return a.load()
+			if err := a.load(); err != nil {
+				return err
+			}
+			if cmd.Name() == "doctor" || cmd.Name() == "serve" {
+				return nil
+			}
+			return checkRoot(a.cfg.RootProjectsFolder)
 		},
 	}
 	root.SetVersionTemplate("sudoku {{.Version}}\n")
