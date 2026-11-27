@@ -5,8 +5,10 @@ package portcheck
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -113,6 +115,8 @@ func portRange(s string) (int, int, bool) {
 
 // Free reports whether the port can be bound on the host. Both the wildcard and loopback are tried:
 // with SO_REUSEADDR (macOS/BSD) binding 0.0.0.0 can succeed while 127.0.0.1:port is taken.
+// A permission error is not "busy": macOS lets unprivileged users bind ports < 1024 only on the
+// wildcard address, so 127.0.0.1:80 fails with EACCES even when nothing listens there.
 func Free(hostIP string, port int, proto string) bool {
 	addrs := []string{"0.0.0.0", "127.0.0.1"}
 	if hostIP != "" && hostIP != "0.0.0.0" && hostIP != "::" {
@@ -124,6 +128,9 @@ func Free(hostIP string, port int, proto string) bool {
 		if proto == ProtoUDP {
 			c, err := lc.ListenPacket(context.Background(), "udp", addr)
 			if err != nil {
+				if denied(err) {
+					continue
+				}
 				return false
 			}
 			_ = c.Close()
@@ -131,11 +138,19 @@ func Free(hostIP string, port int, proto string) bool {
 		}
 		l, err := lc.Listen(context.Background(), "tcp", addr)
 		if err != nil {
+			if denied(err) {
+				continue
+			}
 			return false
 		}
 		_ = l.Close()
 	}
 	return true
+}
+
+// denied reports EACCES/EPERM: we may not bind the port, which says nothing about it being in use.
+func denied(err error) bool {
+	return errors.Is(err, os.ErrPermission)
 }
 
 func publishes(c docker.Container, port int, proto string) bool {

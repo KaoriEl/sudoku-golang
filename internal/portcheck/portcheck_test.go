@@ -3,6 +3,8 @@ package portcheck
 import (
 	"context"
 	"net"
+	"os"
+	"runtime"
 	"strconv"
 	"sudoku-golang/internal/docker"
 	"testing"
@@ -48,5 +50,23 @@ func TestCheckFindsBusyPort(t *testing.T) {
 	c := Check(context.Background(), []Binding{{File: "/r/c.yaml", Service: "db", Port: port, Proto: "tcp"}}, []docker.Container{self})
 	if len(c) != 1 || c[0].Kind != KindContainer {
 		t.Fatalf("container conflict missed: %+v", c)
+	}
+}
+
+func TestFreeIgnoresPermissionDenied(t *testing.T) {
+	if runtime.GOOS != "darwin" || os.Geteuid() == 0 {
+		t.Skip("privileged-port EACCES on loopback is macOS-specific")
+	}
+	if !Free("", 1, "tcp") {
+		t.Fatal("port 1 is unused but reported busy (EACCES on 127.0.0.1 treated as busy)")
+	}
+	var lc net.ListenConfig
+	busy, err := lc.Listen(context.Background(), "tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer busy.Close()
+	if Free("", busy.Addr().(*net.TCPAddr).Port, "tcp") {
+		t.Fatal("port held on 127.0.0.1 reported free")
 	}
 }
