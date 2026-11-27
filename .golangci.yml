@@ -60,6 +60,17 @@ linters:
       ignore-generated-header: true
       severity: warning
   exclusions:
+    rules:
+      # These structs mirror external JSON schemas (Docker Engine API, GitHub API) field by field.
+      - path: internal/engine/
+        linters:
+          - tagliatelle
+      - path: internal/selfupdate/
+        linters:
+          - tagliatelle
+      - path: _test\.go
+        linters:
+          - goconst
     generated: lax
     presets:
       - comments

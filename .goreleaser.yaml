@@ -1,0 +1,43 @@
+# Релизы sudoku: `git tag v1.2.3 && git push --tags` (workflow .github/workflows/release.yml)
+# или локально `goreleaser release --clean`. Имена архивов и checksums.txt — контракт `sudoku update`.
+version: 2
+project_name: sudoku
+
+before:
+  hooks:
+    - go mod tidy
+    - npm --prefix web ci --no-audit --no-fund
+    - npm --prefix web run build
+
+builds:
+  - id: sudoku
+    main: ./cmd/main.go
+    binary: sudoku
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    ldflags:
+      - -s -w
+      - -X sudoku-golang/internal/version.Version={{ .Tag }}
+      - -X sudoku-golang/internal/version.Commit={{ .ShortCommit }}
+      - -X sudoku-golang/internal/version.Date={{ .Date }}
+
+archives:
+  - id: sudoku
+    name_template: "sudoku_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - README.en.md
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+changelog:
+  sort: asc

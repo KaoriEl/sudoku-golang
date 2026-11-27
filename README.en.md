@@ -18,6 +18,7 @@ This project is a CLI tool written in Go for managing infrastructure and service
 * [Requirements](#requirements)
 * [Installation and Build](#installation-and-build)
 * [Available Commands](#available-commands)
+* [Web admin](#web-admin)
 * [Configuration](#configuration)
 * [Infrastructure](#infrastructure)
     * [Services](#services)
@@ -32,56 +33,174 @@ This project is a CLI tool written in Go for managing infrastructure and service
 
 ## Installation and Build ⚙️
 
-1. Clone the repository:
+sudoku runs on **Linux, macOS and Windows** (amd64 and arm64): a single dependency-free binary with the admin
+panel embedded. All it needs is Docker (Docker Desktop, Colima, OrbStack, Rancher Desktop or dockerd) with compose
+(`docker compose` or `docker-compose`).
+
+**Release binary** (recommended): download the archive for your platform from the releases page, unpack it and run
 
 ```sh
-git clone
-cd sudoku-golang
-````
-
-2. Create a `.env` file in the project root and set the required variables (see [Configuration](#configuration)).
-
-3. Run the build script:
-
-```sh
-make build
+./sudoku setup --root ~/projects --prefix dev   # Windows: .\sudoku.exe setup --root C:\projects --prefix dev
+cd ~/projects && ./sudoku doctor && ./sudoku start
 ```
 
-The script performs the following actions:
+`setup` copies the binary into `ROOT_PROJECTS_FOLDER`, creates `.env` (if missing), lays out `sudoku-config/`
+(embedded in the binary) and generates the root `compose.yaml` with the container-name prefix. Existing files are
+left alone unless `--overwrite-env` / `--regenerate-compose` is given (old ones go to `.bak`). Later updates:
+`./sudoku update` (verifies the SHA-256 from the release's `checksums.txt`).
 
-* ✅ Checks for the existence of `.env` and the `ROOT_PROJECTS_FOLDER` variable.
-* 📂 Creates necessary folders: `${ROOT_PROJECTS_FOLDER}` and `build`.
-* 🛠️ Builds the `sudoku` binary into the `build` folder.
-* 📁 Copies the binary and `.env` to `${ROOT_PROJECTS_FOLDER}`.
-* 📄 Copies the configuration folder `sudoku-config` and the `compose.yaml` file to `${ROOT_PROJECTS_FOLDER}` (if not already copied).
+**From source** (needs Go and Node.js/npm):
 
-4. After successful execution, the binary and configuration will be ready to use in `${ROOT_PROJECTS_FOLDER}`.
+```sh
+git clone … && cd sudoku-golang
+cp .env.example .env        # set ROOT_PROJECTS_FOLDER and PREFIX_CONTAINER_NAME
+make build                  # UI + binary + `sudoku setup` (OVERWRITE_ENV=1 / REGENERATE_COMPOSE=1 to overwrite)
+```
+
+Other targets: `make bin` (binary only, into `build/`), `make cross` (all 6 platforms into `build/dist`), `make test`,
+`make lint`, `make release-snapshot` (goreleaser locally). Releases are built by `.github/workflows/release.yml` on
+`v*` tags.
 
 ## Available Commands 💻
 
-Commands can be run via the `sudoku` binary or directly via Go:
+```sh
+sudoku start [targets...]   # start (no targets = everything; infrastructure first, then wait for its healthchecks)
+sudoku stop | down | restart | build | rebuild | force-build | force-rebuild [targets...]
+sudoku status [targets...]  # status table (--json, -a to include foreign containers)
+sudoku logs <targets...> -f # logs (compose logs), --tail, --since, -t
+sudoku exec <service> [-- command...]  # shell or command in a service (-u user, -T no TTY)
+sudoku sets list | add <name> <targets...> | rm <name>   # project sets
+sudoku doctor               # diagnostics: docker, compose, socket, projects, ports, permissions (--json)
+sudoku serve                # web admin
+sudoku setup                # bootstrap ROOT_PROJECTS_FOLDER
+sudoku update [--check]     # update to the latest release
+sudoku version
+sudoku completion bash|zsh|fish|powershell   # completion (projects, services and sets)
+```
+
+**Targets**: a project name (a folder with `compose-sudoku.yaml`), `infra` (the root `compose.yaml`), a service name
+(found in any project), `project/service` (or `project:service`), patterns (`api-*`, `*/db`). Sets: `--set backend`.
 
 ```sh
-./sudoku build        # Builds all containers
-./sudoku start        # Starts the built containers
-./sudoku stop         # Stops all containers
-./sudoku forceBuild   # Forces container build
-./sudoku down         # Stops and removes all containers
-./sudoku restart      # Restarts all containers
-./sudoku rebuild      # Stops, builds, and starts containers
-./sudoku forceRebuild # Forces container rebuild
+sudoku start infra api billing/worker
+sudoku restart --set backend --no-wait
+sudoku logs infra/traefik -f
+sudoku exec billing/db -- psql -U postgres
 ```
+
+Global flags: `--debug`, `--log`, `-C <dir>` (read `.env` from another directory). `start`/`restart`/`rebuild` accept
+`--wait` / `--no-wait` (wait for the infrastructure healthchecks) and `--no-preflight` (skip the port conflict
+check). The exit code is 1 if any compose file failed.
+
+## Web admin 🖥️
+
+`./sudoku serve` starts the admin at `http://127.0.0.1:7777`. The address comes from `ADMIN_ADDR` in `.env` and the
+`--addr` flag overrides it; only loopback addresses are allowed. Enable logs with `--log`.
+The UI is embedded into the binary.
+
+`make build` no longer overwrites an existing `${ROOT_PROJECTS_FOLDER}/compose.yaml` (it holds your edits and ports added
+from the admin). Regenerate it with `REGENERATE_COMPOSE=1 make build` (the old file is kept as `compose.yaml.bak`).
+
+Features:
+
+* lists every container of the projects under `ROOT_PROJECTS_FOLDER`, grouped by compose file: status, docker name,
+  IP and DNS names per network, published ports, Traefik hosts (`Host(...)` from labels);
+* stops, starts and restarts a single container;
+* starts, stops and restarts all projects (same as `sudoku start/stop/restart`) with a per-compose-file run log;
+* per-container panel: live **logs** (`docker logs -f`, filter, wrap, download), an in-browser **terminal**
+  (`docker exec -it`, bash or sh) and **build** info: the full `docker build` command derived from
+  `docker compose config` (with build args), ready-made compose commands and a "rebuild service" button;
+* **Monitoring**: live resource usage via the Docker Engine API (every 2 s by default, up to 30 minutes of history): CPU, memory, network
+  and block I/O in total and per container, charts with crosshair tooltips, a sortable table with sparklines, and
+  Docker disk usage (images, volumes, container layers, build cache). Every container also has a "Resources" tab.
+  By default metrics are collected **only while the monitoring page (or a Resources tab) is open**. Settings has a
+  background-collection toggle and the polling interval for both modes: live 1–60 s (default 2 s), background
+  5 s – 1 h (default 10 s). Stored in `${ROOT_PROJECTS_FOLDER}/sudoku-config/admin.yaml`;
+* **Cleanup**: frees disk space by removing unused images, build cache (all of it, or entries older than 1/7/30 days)
+  and stopped containers. It shows a preview first and removes only what you tick. **Volumes are never removed**, not
+  even with containers: `docker rm` runs without `-v`. Stopped containers with Docker volumes and anything that looks
+  like a database (by image, name or data path) are protected and can't be selected. Images are deleted without
+  force, so an image used by any container is refused. The server re-reads Docker state and re-checks every item
+  before deleting;
+* **"Don't start"** flag per service: skipped by "start all" / "restart all" and by the CLI `sudoku start`, `restart`,
+  `rebuild`, `build`. Stored in `${ROOT_PROJECTS_FOLDER}/sudoku-config/disabled.yaml` (hand-editable). If an enabled
+  service `depends_on` a disabled one, compose still starts it, and the admin warns about that;
+* **Ports**: manages Traefik ports in the root `compose.yaml` (adds/removes `ports:` entries with comments and,
+  optionally, entryPoints in `sudoku-config/traefik/traefik.yaml`), shows which containers use each entryPoint and
+  applies changes by recreating Traefik. A `*.sudoku.bak` copy is written before every change;
+* **Multi-select**: tick services (or a whole group/table) and start, stop or restart them in one run
+  (`compose up -d` / `stop` for just those services of each file), or flag them "don't start" / "start again" at once;
+* **Config editor** (Settings): edits `.env` in the `serve` working directory (`ROOT_PROJECTS_FOLDER`, `DOCKER_PATH`,
+  `DOCKER_COMPOSE_PATH`, `MAX_WORKERS`, `ADMIN_ADDR`). Values are validated, other lines and comments are kept, a
+  `.env.sudoku.bak` copy is written, and `serve` re-executes itself to apply them. Changing the address warns that the
+  current page will stop working and then opens the new address. An enabled autostart unit is refreshed.
+  `make build` no longer overwrites an existing `${ROOT_PROJECTS_FOLDER}/.env` (`OVERWRITE_ENV=1` forces it);
+* **Settings**: autostart of `sudoku serve` at login (macOS LaunchAgent, Linux `systemd --user`) and re-enabling
+  confirmations hidden with "don't show again";
+* optionally shows foreign compose containers (outside `ROOT_PROJECTS_FOLDER`), read-only.
+* **Live updates**: the admin follows Docker events and pushes changes to the browser over SSE (`/api/events`) —
+  statuses change within ~250 ms without polling (polling remains a 30 s safety net);
+* **Alerts**: an OS notification (macOS, Linux `notify-send`, Windows toast) and a browser notification when a
+  container crashes (not stopped on purpose), fails its healthcheck or is OOM-killed; listed on "Monitoring";
+* **Startup order**: "Start all" and `sudoku start` bring up the infrastructure, wait for its healthchecks
+  (configurable, up to 3 min by default) and only then start the projects;
+* **Sets**: named groups of targets (`sudoku-config/sets.yaml`), started/stopped with one click, created from the
+  services selected in the table;
+* **Command palette**: `⌘K` / `Ctrl+K` — navigation, logs/terminal/config/restart of any service;
+* **Logs**: level filter (WARN+/ERROR), search with highlighting and `Enter`/`Shift+Enter` navigation, a merged
+  stream of all services of a project, full-log download streamed from the server;
+* **Config**: the effective `compose config` of a service, the uninterpolated version and its `${VAR}` references
+  with unset ones highlighted; secrets are masked until revealed;
+* **Runs**: history of all runs (last 100, `sudoku-config/runs/`) with each step's output, survives restarts;
+* **Image updates**: "Check updates" compares the local image digest with the registry (no pull, auth from
+  `~/.docker/config.json`); an "UPDATE" badge marks the service;
+* **Backups**: one-click dumps of PostgreSQL, MySQL/MariaDB, MongoDB and Redis/KeyDB/Valkey into `${ROOT}/backups/`,
+  download and restore (typed confirmation), keeping the last N per database;
+* **Network → Domains & TLS**: Traefik domains and how they resolve, a managed block in the hosts file (without
+  permission it stages the file and prints `sudo cp …` / the PowerShell command), local HTTPS via mkcert plus the
+  Traefik file-provider config;
+* **Port conflicts**: before starting, checks whether a published port is taken by another container or a host
+  process and offers to stop the conflicting container;
+* **Schedules**: periodic disk cleanup (build cache, dangling images, stopped containers) and update checks;
+* **Diagnostics**: the same checks as `sudoku doctor` on the settings page.
+
+Security: the server listens only on loopback (`localhost`, `127.0.0.1`, `::1`) or a unix socket
+(`ADMIN_ADDR=unix:/path/sudoku.sock`, mode 0600), rejects cross-site requests (`Sec-Fetch-Site`, `Origin`, JSON-only
+POSTs) and cannot be framed (CSP `frame-ancestors 'none'`). On shared machines set `ADMIN_TOKEN`: the panel then opens
+only via the `http://127.0.0.1:7777/?token=…` link printed by `sudoku serve` (an HttpOnly cookie afterwards), and API
+clients send `Authorization: Bearer <token>`. Never expose the admin publicly: it controls Docker on your machine.
+
+UI development:
+
+```sh
+make bin         # build only the binary (UI + go build) into build/sudoku, no deploy
+make serve       # build the UI and run the API on :7777
+make web-dev     # Vite dev server on :5173 proxying /api to :7777
+```
+
+The UI design system lives in `.agents/design/`.
 
 ## Configuration 🔧
 
-Configuration is loaded from `.env` or environment variables.
+Configuration comes from `.env` in the working directory (or `-C <dir>`), environment variables or
+`/vault/secrets/CRED_<NAME>`.
 
-Available variables:
+* `ROOT_PROJECTS_FOLDER` — the projects root (required)
+* `DOCKER_PATH` — docker command (default `docker` from PATH; paths with spaces are fine)
+* `DOCKER_COMPOSE_PATH` — compose command (default `docker-compose` if installed, else `docker compose`)
+* `MAX_WORKERS` — stop/down parallelism (1–64, default 5)
+* `ADMIN_ADDR` — admin address: loopback `host:port` (default `127.0.0.1:7777`) or `unix:/path.sock`
+* `ADMIN_TOKEN` — admin access token (optional)
+* `PREFIX_CONTAINER_NAME` — infrastructure container-name prefix (for `sudoku setup`)
 
-* `DOCKER_PATH` — path to the Docker executable (default: `/usr/bin/env docker`)
-* `DOCKER_COMPOSE_PATH` — path to Docker Compose (default: `/usr/bin/env docker compose`)
-* `MAX_WORKERS` — number of workers (default: 5)
-* `ROOT_PROJECTS_FOLDER` — root folder for projects where the binary and configuration will be copied (required for the script to work)
+The Docker Engine is located like the docker CLI does: `DOCKER_HOST` (unix, `npipe://` on Windows, `tcp://` with
+`DOCKER_TLS_VERIFY`/`DOCKER_CERT_PATH`), then the current `docker context`, then the default socket / named pipe.
+
+Admin and CLI settings (startup order, notifications, schedules, backups, metrics) live in
+`${ROOT_PROJECTS_FOLDER}/sudoku-config/admin.yaml`, sets in `sets.yaml`, disabled services in `disabled.yaml`.
+
+Autostart of `sudoku serve` at login: macOS LaunchAgent, Linux `systemd --user`, Windows a hidden launcher in the
+Startup folder.
 
 ## Infrastructure 🏗️
 

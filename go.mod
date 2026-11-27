@@ -5,10 +5,14 @@ go 1.24.4
 toolchain go1.24.7
 
 require (
+	github.com/Microsoft/go-winio v0.6.2
 	github.com/alperdrsnn/clime v1.1.1
+	github.com/coder/websocket v1.8.15
+	github.com/creack/pty v1.1.24
 	github.com/gammazero/workerpool v1.1.3
 	github.com/joho/godotenv v1.5.1
 	github.com/spf13/cobra v1.8.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
