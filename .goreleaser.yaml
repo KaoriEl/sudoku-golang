@@ -5,7 +5,7 @@ project_name: sudoku
 
 before:
   hooks:
-    - go mod tidy
+    - go mod download
     - npm --prefix web ci --no-audit --no-fund
     - npm --prefix web run build
 
@@ -38,6 +38,9 @@ archives:
 checksum:
   name_template: checksums.txt
   algorithm: sha256
+
+release:
+  prerelease: auto
 
 changelog:
   sort: asc
